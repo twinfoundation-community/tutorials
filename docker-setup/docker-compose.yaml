@@ -25,6 +25,7 @@ services:
       - ./.env.bootstrap:/app/.env.bootstrap
     entrypoint: ["node", "/app/bin/index.js", "bootstrap-legacy", "--load-env=.env.bootstrap"]
 
+
   twin-node:
     image: twinfoundation/twin-node:0.0.3-next.16
     container_name: twin_node
@@ -35,6 +36,7 @@ services:
     env_file: ./.env
     volumes: 
       - twin_data:/var/lib/twin
+
 
 volumes:
   mysql_data:
