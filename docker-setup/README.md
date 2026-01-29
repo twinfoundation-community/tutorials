@@ -4,13 +4,13 @@ This is an example on how to use Docker to run an instance of a TWIN Node using 
 
 ## Steps
 
-Perform bootstrapping through
+A/ Perform bootstrapping through
 
 ```sh
-docker compose run twin-bootstrap --rm
+docker compose run --rm twin-node-bootstrap 
 ```
 
-Then run the node through
+B/ Then run the node through
 
 ```sh
 docker compose up -d twin-node 
