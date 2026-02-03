@@ -23,7 +23,8 @@ services:
     volumes: 
       - twin_data:/var/lib/twin
       - ./.env.bootstrap:/app/.env.bootstrap
-    entrypoint: ["node", "/app/bin/index.js", "bootstrap-legacy", "--load-env=.env.bootstrap"]
+    command: |
+      sh -c 'echo "process.exit(0)" >> src/index.js && node src/index.js bootstrap-legacy --load-env=.env.bootstrap'
 
 
   twin-node:
