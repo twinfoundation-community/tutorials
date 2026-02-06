@@ -16,7 +16,7 @@ services:
       - mysql_data:/var/lib/mysql
 
   twin-node-bootstrap:
-    image: twinfoundation/twin-node:0.0.3-next.18
+    image: twinfoundation/twin-node:0.0.3-next.20
     depends_on:
       - db
     env_file: ./.env
@@ -28,7 +28,7 @@ services:
 
 
   twin-node:
-    image: twinfoundation/twin-node:0.0.3-next.18
+    image: twinfoundation/twin-node:0.0.3-next.20
     container_name: twin_node
     depends_on:
       - db
