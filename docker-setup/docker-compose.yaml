@@ -16,7 +16,7 @@ services:
       - mysql_data:/var/lib/mysql
 
   twin-node-bootstrap:
-    image: twinfoundation/twin-node:0.0.3-next.20
+    image: twinfoundation/twin-node:0.0.3-next.39
     depends_on:
       - db
     env_file: ./.env
@@ -24,11 +24,11 @@ services:
       - twin_data:/var/lib/twin
       - ./.env.bootstrap:/app/.env.bootstrap
     command: |
-      sh -c 'node src/index.js bootstrap-legacy --load-env=.env.bootstrap'
+      sh -c 'node src/index.js bootstrap-legacy --load-env=.env.bootstrap-legacy'
 
 
   twin-node:
-    image: twinfoundation/twin-node:0.0.3-next.20
+    image: twinfoundation/twin-node:0.0.3-next.39
     container_name: twin_node
     depends_on:
       - db
