@@ -9,3 +9,11 @@
 ## Bootstrap Howto
 
 See [Bootstrap Recipes](./HOWTO-bootstrap-node.md)
+
+## Troubleshooting
+
+It is necessary to grant permissions to the `twin` user to create DB i.e.
+
+```sql
+GRANT ALL PRIVILEGES ON twin.* TO 'twin'@'%'; 
+```

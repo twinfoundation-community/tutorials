@@ -81,7 +81,7 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	/**
 	 * App Name.
 	 */
-	public static readonly APP_ID = "https://twin.example.org/app1";
+	public static readonly APP_ID = "https://vtwt-1.virtualwatchtower.org";
 
 	/**
 	 * Runtime name for the class.

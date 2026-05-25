@@ -10,6 +10,12 @@ services:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_USER: twin
       MYSQL_PASSWORD: twin
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u twin -ptwin --silent || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     ports:
       - "3306:3306"
     volumes:
@@ -19,7 +25,8 @@ services:
     image: twinfoundation/twin-node:0.0.3-next.40
     container_name: twin_node
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "3000:3000"
     env_file: ./.env.local
@@ -27,7 +34,7 @@ services:
       - twin_data:/var/lib/twin
       - ./.env.local.bootstrap:/app/.env.local.bootstrap
       - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
-
+      
 volumes:
   mysql_data:
   twin_data:
