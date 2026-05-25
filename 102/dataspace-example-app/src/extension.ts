@@ -42,7 +42,7 @@ export async function extensionInitialise(
 export async function extensionInitialiseEngine(engineCore: IEngineCore): Promise<void> {
 	engineCore.addTypeInitialiser(
 		"testAppComponent",
-		"@twin.org/dataspace-test-app",
+		"@twin-community.org/dataspace-example-app",
 		"testAppInitialiser"
 	);
 }
@@ -58,7 +58,7 @@ export async function extensionInitialiseEngineServer(
 ): Promise<void> {
 	engineServer.addRestRouteGenerator(
 		"testAppComponent",
-		"@twin.org/dataspace-test-app",
+		"@twin-community.org/dataspace-example-app",
 		"generateRestRoutes"
 	);
 }

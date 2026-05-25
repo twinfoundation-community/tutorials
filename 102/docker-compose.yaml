@@ -1,0 +1,33 @@
+name: 'TWIN Node 102'
+
+services:
+  db:
+    image: mysql:8.4.7
+    container_name: mysql8_container
+    hostname: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: twin
+      MYSQL_PASSWORD: twin
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  twin-node:
+    image: twinfoundation/twin-node:0.0.3-next.40
+    container_name: twin_node
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    env_file: ./.env.local
+    volumes: 
+      - twin_data:/var/lib/twin
+      - ./.env.local.bootstrap:/app/.env.local.bootstrap
+      - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
+
+volumes:
+  mysql_data:
+  twin_data:
