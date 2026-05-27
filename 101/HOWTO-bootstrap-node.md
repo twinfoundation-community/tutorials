@@ -1,18 +1,12 @@
 # Steps to bootstrap a Node
 
-1. Create an Identity
+1. Create an Identity for the Node
 
 ```sh
 node src/index.js identity-create --load-env=./.env.local.bootstrap
 ```
 
-With docker compose:
-
-```sh
-docker compose run --rm twin-node sh -c 'node src/index.js identity-create --load-env=.env.local.bootstrap'
-```
-
-1. Add a verification method
+1. Add verification methods for the Node's Identity
 
 ```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
@@ -23,7 +17,13 @@ node src/index.js identity-verification-method-create --identity="did:entity-sto
 1. Set Node Identity
 
 ```sh
- node-set-identity --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --load-env=./.env.local.bootstrap
+node src/index.js node-set-identity --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --load-env=./.env.local.bootstrap
+```
+
+1. Add encryption key to the Node Identity
+
+```sh
+./twin-node.sh vault-key-create --identity=""did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --key-id="param-encryption" --key-type="ChaCha20Poly1305"
 ```
 
 1. Create a tenant
@@ -55,6 +55,12 @@ node src/index.js identity-create --load-env=./.env.local.bootstrap
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0xf53d09732675c67f83ee3894e013b8244f543f3148c6ceca53367a93dec984bb" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
 ```
 
+In order to sign JWTs in data exchange operations it is needed to created an assertion method:
+
+```sh
+./twin-node.sh identity-verification-method-create --identity="did:entity-storage:0xf53d09732675c67f83ee3894e013b8244f543f3148c6ceca53367a93dec984bb" --verification-method-id="trust-assertion" --verification-method-type="assertionMethod"
+```
+
 6.2 Create a user DID
 
 ```sh
@@ -72,4 +78,12 @@ node src/index.js user-create --user-identity="did:entity-storage:0x56a70c43e443
 ```sh
 Email: jcantera@example.com
 Password: yM5?NgPPAio+TmWx
+```
+
+## Using Docker Compose
+
+All the instructions above can be performed with `docker compose`, as a way example creating an identity would be performed as follows:
+
+```sh
+docker compose run --rm twin-node sh -c 'node src/index.js identity-create --load-env=.env.local.bootstrap'
 ```

@@ -34,6 +34,8 @@ services:
       - twin_data:/var/lib/twin
       - ./.env.local.bootstrap:/app/.env.local.bootstrap
       - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
+      - ./provider.json:/app/provider.json
+      - ./consumer.json:/app/consumer.json
       
 volumes:
   mysql_data:

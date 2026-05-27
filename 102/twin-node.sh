@@ -7,8 +7,8 @@ fi
 
 command='node src/index.js'
 
-trail='--load-env=./.env.local.bootstrap'
-final_command="$command $* $trail"
+bootstrap_env='--load-env=./.env.local.bootstrap'
+final_command="$command $* $bootstrap_env"
 
 
 docker compose run --rm -it twin-node sh -c "${final_command}"
