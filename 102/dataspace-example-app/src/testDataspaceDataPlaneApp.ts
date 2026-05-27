@@ -183,7 +183,7 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 		return [
 			{
 				objectType: "https://vocabulary.uncefact.org/Consignment",
-				processingGroupId: "test-default"
+				// processingGroupId: "test-default"
 			}
 		];
 	}

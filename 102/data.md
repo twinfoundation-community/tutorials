@@ -76,6 +76,14 @@ Password: yM5?NgPPAio+TmWx
 
 Needed for data exchange operations:
 
+Data Consumer:
+
 ```sh
-./twin-node.sh identity-verifiable-credential-create --identity="did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431" --verification-method-id="trust-assertion" --subject-json="./subject.json"
+./twin-node.sh identity-verifiable-credential-create --identity="did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431" --verification-method-id="trust-assertion" --subject-json="./consumer.json"
+```
+
+Data Provider:
+
+```sh
+./twin-node.sh identity-verifiable-credential-create --identity="did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f" --verification-method-id="trust-assertion" --subject-json="./provider.json"
 ```
