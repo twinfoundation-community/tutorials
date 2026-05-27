@@ -1,7 +1,7 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
-import type { IRestRoute } from "@twin.org/api-models";
-import { Is } from "@twin.org/core";
+import type { IHttpRequestContext, IRestRoute } from "@twin.org/api-models";
+import { ComponentFactory, Is } from "@twin.org/core";
 import { DataspaceAppFactory } from "@twin.org/dataspace-models";
 import type {
 	EngineTypeInitialiserReturn,
@@ -13,6 +13,8 @@ import type {
 import { type IEngineConfig, EngineTypeHelper } from "@twin.org/engine-types";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 import { ConsumerClient } from "./consumerClient.js";
+import { nameof } from "@twin.org/nameof";
+import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 
 /**
  * Initialise the  extension.
@@ -23,9 +25,13 @@ export async function extensionInitialise(
 	envVars: { [id: string]: string | unknown },
 	nodeEngineConfig: IEngineCoreConfig
 ): Promise<void> {
-	nodeEngineConfig.types.consumerClient = [
+	nodeEngineConfig.types.consumerClientComponent = [
 		{
-			type: "service"
+			type: "service",
+			options: {
+				config: {}
+			},
+			restPath: "consumer-client"
 		}
 	];
 }
@@ -103,5 +109,48 @@ export function consumerClientInitialiser(
  * @returns The rest routes.
  */
 export function generateRestRoutes(baseRouteName: string, componentName: string): IRestRoute[] {
-	return [];
+	const consumerClientRoute: IRestRoute<{ body: unknown }, {body: unknown}> = {
+		operationId: "consumerClient",
+		summary: "Get Data",
+		method: "GET",
+		tag: "client",
+		path: `${baseRouteName}/query-data`,
+		handler: async (httpRequestContext, request) =>
+			consumerGetData(httpRequestContext, componentName, request),
+		requestType: {
+			type: "unknown",
+			examples: [
+			]
+		},
+		responseType: [
+			{
+				type: "unknown",
+				examples: [
+				]
+			}
+		],
+		skipAuth: true
+	};
+
+	return [consumerClientRoute];
+}
+
+/**
+ * Get data
+ * @param httpRequestContext The request context for the API.
+ * @param componentName The name of the component to use in the routes.
+ * @param request The request.
+ * @returns The response object with additional http response properties.
+ */
+export async function consumerGetData(
+	httpRequestContext: IHttpRequestContext,
+	componentName: string,
+	request: {body: unknown }
+): Promise<{ body: unknown}> {
+	const component = ComponentFactory.get<IConsumerClientComponent>(componentName);
+	const result = await component.getData();
+
+	return {
+		body: result
+	};
 }

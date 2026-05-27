@@ -8,11 +8,12 @@ import {
   IDataspaceControlPlaneComponent,
   IDataspaceDataPlaneComponent,
 } from "@twin.org/dataspace-models";
+import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 
 /**
  * Test App Activity Handler.
  */
-export class ConsumerClient implements IComponent {
+export class ConsumerClient implements IConsumerClientComponent {
   private _logging: ILoggingComponent;
 
   private _dataspaceControlPlane: IDataspaceControlPlaneComponent;
@@ -44,5 +45,9 @@ export class ConsumerClient implements IComponent {
 
   public async getData(): Promise<unknown> {
     return null;
+  }
+
+  public async start(nodeLoggingComponentType?: string): Promise<void> {
+    
   }
 }
