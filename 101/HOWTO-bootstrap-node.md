@@ -12,6 +12,8 @@ node src/index.js identity-create --load-env=./.env.local.bootstrap
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
 
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="auth-signing"  --load-env=./.env.local.bootstrap
+
+node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="trust-assertion"  --load-env=./.env.local.bootstrap
 ```
 
 1. Set Node Identity
