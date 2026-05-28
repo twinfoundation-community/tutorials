@@ -30,6 +30,8 @@ export class ConsumerClient implements IConsumerClientComponent {
 
   private _dataspaceControlPlane: IDataspaceControlPlaneComponent;
 
+  private _providerControlPlane: IDataspaceControlPlaneComponent;
+
   private _dataspaceDataPlane: IDataspaceDataPlaneComponent;
 
   private _trustComponent: ITrustComponent;
@@ -53,6 +55,8 @@ export class ConsumerClient implements IConsumerClientComponent {
    * @param options The constructor options.
    */
   constructor(options?: IConsumerClientConstructorOptions) {
+    console.log(ComponentFactory.names());
+
     this._dataspaceControlPlane =
       ComponentFactory.get<IDataspaceControlPlaneComponent>(
         options?.dataspaceControlPlaneComponentType ?? "dataspaceControlPlane",
@@ -64,12 +68,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 
     this._dataspaceDataPlane =
       ComponentFactory.get<IDataspaceDataPlaneComponent>(
-        options?.loggingComponentType ?? "dataspaceControlPlane",
+        options?.loggingComponentType ?? "dataspaceDataPlane",
       );
 
     this._trustComponent = ComponentFactory.get<ITrustComponent>(
       options?.trustComponentType ?? "trust",
     );
+
+    this._providerControlPlane =
+      ComponentFactory.get<IDataspaceControlPlaneComponent>(
+        options?.dataspaceControlPlaneOfDataProviderType ??
+          "dataspaceControlPlaneOfDataProvider",
+      );
   }
 
   public async getData(): Promise<unknown> {
@@ -128,7 +138,7 @@ export class ConsumerClient implements IConsumerClientComponent {
             try {
               // Now we start the Data Transfer
               const transferRequestResult =
-                await this._dataspaceControlPlane.requestTransfer(
+                await this._providerControlPlane.requestTransfer(
                   {
                     "@context": [DataspaceProtocolContexts.Context],
                     "@type":

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0.
 import type { IHttpRequestContext, IRestRoute } from "@twin.org/api-models";
 import { ComponentFactory, IComponent, Is } from "@twin.org/core";
-import { DataspaceAppFactory } from "@twin.org/dataspace-models";
 import type {
 	EngineTypeInitialiserReturn,
 	IEngineCore,
@@ -10,7 +9,7 @@ import type {
 	IEngineCoreContext,
 	IEngineServer
 } from "@twin.org/engine-models";
-import { type IEngineConfig, EngineTypeHelper } from "@twin.org/engine-types";
+import { type IEngineConfig, DataspaceControlPlaneComponentType, EngineTypeHelper } from "@twin.org/engine-types";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 import { ConsumerClient } from "./consumerClient.js";
 import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
@@ -33,6 +32,21 @@ export async function extensionInitialise(
 			restPath: "consumer-client"
 		}
 	];
+	nodeEngineConfig.types.dataspaceControlPlaneComponent = [
+    {
+      type: DataspaceControlPlaneComponentType.RestClient,
+      options: {
+        endpoint: "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9",
+      },
+    },
+	 {
+      type: DataspaceControlPlaneComponentType.Service,
+      options: {
+        config: {}
+      },
+	  restPath: "dataspace-control-plane"
+    },
+  ];
 }
 
 /**
@@ -86,9 +100,10 @@ export function consumerClientInitialiser(
 				EngineTypeHelper.mergeConfig<IConsumerClientConstructorOptions>(
 					{
 						loggingComponentType: engineCore.getRegisteredInstanceType("loggingComponent"),
-						dataspaceControlPlaneComponentType: engineCore.getRegisteredInstanceType("dataspaceControlPlaneComponent"),
+						dataspaceControlPlaneComponentType: "dataspace-control-plane-service",
 						dataspaceDataPlaneComponentType: engineCore.getRegisteredInstanceType("dataspaceDataPlaneComponent"),
-						trustComponentType: engineCore.getRegisteredInstanceType("trustComponent")
+						trustComponentType: engineCore.getRegisteredInstanceType("trustComponent"),
+						dataspaceControlPlaneOfDataProviderType: "dataspace-control-plane-rest-client",
 					},
 					createConfig.options
 				)
