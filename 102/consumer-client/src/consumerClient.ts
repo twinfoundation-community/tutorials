@@ -150,7 +150,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 
                     format: "twin:Http-Pull-Query-Format",
                   },
-                  token,
+                  token
                 );
 
               if (
