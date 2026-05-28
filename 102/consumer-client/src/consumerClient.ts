@@ -9,7 +9,7 @@ import {
   IDataspaceDataPlaneComponent,
 } from "@twin.org/dataspace-models";
 import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
-import { ContextIdStore } from "@twin.org/context";
+import { ContextIdKeys, ContextIdStore, IContextIds } from "@twin.org/context";
 import {
   DataspaceProtocolContexts,
   DataspaceProtocolContractNegotiationStateType,
@@ -20,6 +20,7 @@ import {
   IDataspaceProtocolTransferProcess,
 } from "@twin.org/standards-dataspace-protocol";
 import { randomUUID } from "node:crypto";
+import { ITrustComponent } from "@twin.org/trust-models";
 
 /**
  * Test App Activity Handler.
@@ -30,6 +31,8 @@ export class ConsumerClient implements IConsumerClientComponent {
   private _dataspaceControlPlane: IDataspaceControlPlaneComponent;
 
   private _dataspaceDataPlane: IDataspaceDataPlaneComponent;
+
+  private _trustComponent: ITrustComponent;
 
   public className(): string {
     return "ConsumerClient";
@@ -63,19 +66,38 @@ export class ConsumerClient implements IConsumerClientComponent {
       ComponentFactory.get<IDataspaceDataPlaneComponent>(
         options?.loggingComponentType ?? "dataspaceControlPlane",
       );
+
+    this._trustComponent = ComponentFactory.get<ITrustComponent>(
+      options?.trustComponentType ?? "trust",
+    );
   }
 
   public async getData(): Promise<unknown> {
     return new Promise<unknown>(async (resolve, reject) => {
-      const ids = await ContextIdStore.getContextIds();
-
+      const ids = (await ContextIdStore.getContextIds()) as IContextIds;
       console.log("IDs", ids);
+
+      // Workaround until we get the organization identity
+      const identity =
+        "did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
+
+      const token = await this._trustComponent.generate(
+        identity,
+        undefined,
+        {},
+        ids[ContextIdKeys.Tenant],
+        identity,
+      );
+
+      console.log("tttttt", token);
 
       const negotiationCallbackId = `negotiation-${new Date().toISOString()}`;
 
       this._dataspaceControlPlane.registerNegotiationCallback(
         negotiationCallbackId,
         {
+          // Handles on state change CN
+          /////////////////////////////
           onStateChanged: async (
             negotiationId: string,
             state: DataspaceProtocolContractNegotiationStateType,
@@ -90,6 +112,8 @@ export class ConsumerClient implements IConsumerClientComponent {
               source: this.className(),
             });
           },
+          // Handles on completed CN
+          /////////////////////////////
           onCompleted: async (negotiationId: string, agreementId: string) => {
             this._dataspaceControlPlane.unregisterNegotiationCallback(
               negotiationCallbackId,
@@ -116,7 +140,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 
                     format: "twin:Http-Pull-Query-Format",
                   },
-                  {},
+                  token,
                 );
 
               if (
@@ -138,7 +162,8 @@ export class ConsumerClient implements IConsumerClientComponent {
                 transferRequestResult as IDataspaceProtocolTransferProcess;
               await this._logging.log({
                 level: LogLevel.Debug,
-                message: `Transfer Process created. State: ${transferResponse.state}, Provider Pid: ${transferResponse.providerPid}, Consumer Pid: ${transferResponse.consumerPid}`,
+                message: `Transfer Process created. State: ${transferResponse.state}, 
+                                        Provider Pid: ${transferResponse.providerPid}, Consumer Pid: ${transferResponse.consumerPid}`,
                 source: this.className(),
               });
 
@@ -147,6 +172,8 @@ export class ConsumerClient implements IConsumerClientComponent {
               reject(error);
             }
           },
+          // Handles on failed CN
+          /////////////////////////////
           onFailed: async (negotiationId: string, reason: string) => {
             await this._logging.log({
               level: LogLevel.Error,
@@ -162,6 +189,7 @@ export class ConsumerClient implements IConsumerClientComponent {
         },
       );
 
+      // Everything starts with a Contract Negotiation
       const negotiationId =
         await this._dataspaceControlPlane.negotiateAgreement(
           this._DATASET_ID,

@@ -88,6 +88,7 @@ export function consumerClientInitialiser(
 						loggingComponentType: engineCore.getRegisteredInstanceType("loggingComponent"),
 						dataspaceControlPlaneComponentType: engineCore.getRegisteredInstanceType("dataspaceControlPlaneComponent"),
 						dataspaceDataPlaneComponentType: engineCore.getRegisteredInstanceType("dataspaceDataPlaneComponent"),
+						trustComponentType: engineCore.getRegisteredInstanceType("trustComponent")
 					},
 					createConfig.options
 				)

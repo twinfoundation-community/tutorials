@@ -20,4 +20,9 @@ export interface IConsumerClientConstructorOptions {
    * Dataspace Data Plane component type.
    */
   dataspaceDataPlaneComponentType?: string;
+
+  /**
+   * The trust component type.
+   */
+  trustComponentType?: string;
 }
