@@ -1,7 +1,7 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
 import type { IHttpRequestContext, IRestRoute } from "@twin.org/api-models";
-import { ComponentFactory, Is } from "@twin.org/core";
+import { ComponentFactory, IComponent, Is } from "@twin.org/core";
 import { DataspaceAppFactory } from "@twin.org/dataspace-models";
 import type {
 	EngineTypeInitialiserReturn,
@@ -13,7 +13,6 @@ import type {
 import { type IEngineConfig, EngineTypeHelper } from "@twin.org/engine-types";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 import { ConsumerClient } from "./consumerClient.js";
-import { nameof } from "@twin.org/nameof";
 import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 
 /**
@@ -77,7 +76,7 @@ export function consumerClientInitialiser(
 	engineCore: IEngineCore<IEngineConfig>,
 	context: IEngineCoreContext,
 	instanceConfig: { type: "service"; options: IConsumerClientConstructorOptions }
-): EngineTypeInitialiserReturn<typeof instanceConfig, typeof DataspaceAppFactory> {
+): EngineTypeInitialiserReturn<typeof instanceConfig, typeof ComponentFactory> {
 	let instanceTypeName: string | undefined;
 	let createComponent;
 
@@ -97,8 +96,9 @@ export function consumerClientInitialiser(
 	}
 
 	return {
+		createComponent: createComponent as (createConfig: typeof instanceConfig) => IComponent,
 		instanceTypeName,
-		createComponent
+		factory: ComponentFactory
 	};
 }
 
