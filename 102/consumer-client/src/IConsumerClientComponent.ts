@@ -4,5 +4,5 @@
 import { IComponent } from "@twin.org/core";
 
 export interface IConsumerClientComponent extends IComponent {
-    getData(): Promise<unknown>;
+	getData(): Promise<unknown>;
 }

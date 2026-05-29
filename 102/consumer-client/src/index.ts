@@ -4,4 +4,3 @@ export * from "./extension.js";
 export * from "./IConsumerClientConstructorOptions.js";
 export * from "./consumerClient.js";
 export * from "./IConsumerClientComponent.js";
-
