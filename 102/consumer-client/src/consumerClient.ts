@@ -153,9 +153,6 @@ export class ConsumerClient implements IConsumerClientComponent {
                   token
                 );
 
-                
-                this._dataspaceControlPlane.
-
               if (
                 transferRequestResult["@type"] ===
                 DataspaceProtocolTransferProcessTypes.TransferError
