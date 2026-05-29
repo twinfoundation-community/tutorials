@@ -1,7 +1,7 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
 import type { IHttpRequestContext, IRestRoute } from "@twin.org/api-models";
-import { ComponentFactory, IComponent, Is } from "@twin.org/core";
+import { ComponentFactory } from "@twin.org/core";
 import type {
 	EngineTypeInitialiserReturn,
 	IEngineCore,
@@ -15,9 +15,9 @@ import {
 	DataspaceDataPlaneComponentType,
 	EngineTypeHelper
 } from "@twin.org/engine-types";
-import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 import { ConsumerClient } from "./consumerClient.js";
-import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
+import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
+import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 
 /**
  * Initialise the  extension.
@@ -102,7 +102,7 @@ export async function extensionInitialiseEngineServer(
 }
 
 /**
- * initializer.
+ * Initializer Component.
  * @param engineCore The engine core.
  * @param context The context for the engine.
  * @param instanceConfig The instance config.
@@ -154,7 +154,7 @@ export function consumerClientInitialiser(
 	}
 
 	return {
-		createComponent: createComponent as (createConfig: typeof instanceConfig) => IComponent,
+		createComponent,
 		instanceTypeName,
 		factory: ComponentFactory
 	};
@@ -192,10 +192,11 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 }
 
 /**
- * Get data
+ * Get data.
  * @param httpRequestContext The request context for the API.
  * @param componentName The name of the component to use in the routes.
  * @param request The request.
+ * @param request.body The body
  * @returns The response object with additional http response properties.
  */
 export async function consumerGetData(

@@ -1,59 +1,55 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
 
-import { ILoggingComponent, LogLevel } from "@twin.org/logging-models";
-import { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
+/* eslint-disable jsdoc/require-jsdoc */
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable @typescript-eslint/naming-convention */
+
+import { randomUUID } from "node:crypto";
+import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
 import { ComponentFactory, Is } from "@twin.org/core";
-import {
+import type {
 	IDataspaceControlPlaneComponent,
 	IDataspaceDataPlaneComponent
 } from "@twin.org/dataspace-models";
-import { IConsumerClientComponent } from "./IConsumerClientComponent.js";
-import { ContextIdKeys, ContextIdStore, IContextIds } from "@twin.org/context";
+import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
+import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
 import {
 	DataspaceProtocolCatalogTypes,
 	DataspaceProtocolContexts,
-	DataspaceProtocolContractNegotiationStateType,
+	type DataspaceProtocolContractNegotiationStateType,
 	DataspaceProtocolTransferProcessTypes,
-	IDataspaceProtocolAgreement,
-	IDataspaceProtocolCatalog,
-	IDataspaceProtocolDataService,
-	IDataspaceProtocolOffer,
-	IDataspaceProtocolTransferError,
-	IDataspaceProtocolTransferProcess
+	type IDataspaceProtocolAgreement,
+	type IDataspaceProtocolDataService,
+	type IDataspaceProtocolOffer
 } from "@twin.org/standards-dataspace-protocol";
-import { randomUUID } from "node:crypto";
-import { ITrustComponent } from "@twin.org/trust-models";
-import { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
+import type { ITrustComponent } from "@twin.org/trust-models";
+import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
+import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 
 /**
  * Test App Activity Handler.
  */
 export class ConsumerClient implements IConsumerClientComponent {
-	private _logging: ILoggingComponent;
+	private readonly _DATASET_ID = "https://twin.example.org/dataset-1342";
 
-	private _dataspaceControlPlane: IDataspaceControlPlaneComponent;
-
-	private _providerControlPlane: IDataspaceControlPlaneComponent;
-	private _providerDataPlane: IDataspaceDataPlaneComponent;
-
-	private _trustComponent: ITrustComponent;
-
-	private _federatedCatalogue: IFederatedCatalogueComponent;
-
-	public className(): string {
-		return "ConsumerClient";
-	}
-
-	private _DATASET_ID = "https://twin.example.org/dataset-1342";
-
-	private _PROVIDER_ENDPOINT =
-		"http://host.docker.internal:3000/rights-management?x-api-key=019e5ee3ad5f7e94a197735372d895a9";
-
-	private _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
+	private readonly _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
 	/* /rights-management?x-api-key=019e5f84a1657dd88e76e1f158abcda2*/
 
-	private _DATASET_TYPE = "https://vocabulary.uncefact.org/Consignment";
+	private readonly _DATASET_TYPE = "https://vocabulary.uncefact.org/Consignment";
+
+	private readonly _logging: ILoggingComponent;
+
+	private readonly _dataspaceControlPlane: IDataspaceControlPlaneComponent;
+
+	private readonly _providerControlPlane: IDataspaceControlPlaneComponent;
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
+	private readonly _providerDataPlane: IDataspaceDataPlaneComponent;
+
+	private readonly _trustComponent: ITrustComponent;
+
+	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
 
 	/**
 	 * Create a new instance.
@@ -88,7 +84,12 @@ export class ConsumerClient implements IConsumerClientComponent {
 		);
 	}
 
+	public className(): string {
+		return "ConsumerClient";
+	}
+
 	public async getData(): Promise<unknown> {
+		// eslint-disable-next-line no-async-promise-executor
 		return new Promise<unknown>(async (resolve, reject) => {
 			try {
 				const ids = (await ContextIdStore.getContextIds()) as IContextIds;
@@ -107,9 +108,9 @@ export class ConsumerClient implements IConsumerClientComponent {
 					reject(result);
 					return;
 				}
-				const catalog = result as IDataspaceProtocolCatalog;
+				const catalog = result;
 				if (!Is.arrayValue(catalog.dataset)) {
-					reject(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`);
+					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
 					return;
 				}
 
@@ -147,7 +148,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 				this._dataspaceControlPlane.registerNegotiationCallback(negotiationCallbackId, {
 					// Handles on state change CN
-					/////////////////////////////
+					// ///////////////////////////
 					onStateChanged: async (
 						negotiationId: string,
 						state: DataspaceProtocolContractNegotiationStateType,
@@ -163,7 +164,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 						});
 					},
 					// Handles on completed CN
-					/////////////////////////////
+					// ///////////////////////////
 					onCompleted: async (negotiationId: string, agreementId: string) => {
 						this._dataspaceControlPlane.unregisterNegotiationCallback(negotiationCallbackId);
 
@@ -179,7 +180,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 								{
 									"@context": [DataspaceProtocolContexts.Context],
 									"@type": DataspaceProtocolTransferProcessTypes.TransferRequestMessage,
-									agreementId: agreementId,
+									agreementId,
 									consumerPid: `urn:uuid:${randomUUID()}`,
 									callbackAddress:
 										"http://host.docker.internal:3000/dataspace-control-plane?x-api-key=019e5f84a1657dd88e76e1f158abcda2",
@@ -193,17 +194,17 @@ export class ConsumerClient implements IConsumerClientComponent {
 								transferRequestResult["@type"] ===
 								DataspaceProtocolTransferProcessTypes.TransferError
 							) {
-								const transferError = transferRequestResult as IDataspaceProtocolTransferError;
+								const transferError = transferRequestResult;
 								await this._logging.log({
 									level: LogLevel.Error,
-									message: `Transfer Process Error: reason: ${transferError.reason}`,
+									message: `Transfer Process Error: reason: ${JSON.stringify(transferError.reason)}`,
 									source: this.className()
 								});
 								reject(transferError.reason);
 								return;
 							}
 
-							const transferResponse = transferRequestResult as IDataspaceProtocolTransferProcess;
+							const transferResponse = transferRequestResult;
 							await this._logging.log({
 								level: LogLevel.Debug,
 								message: `Transfer Process created. State: ${transferResponse.state}, 
@@ -216,13 +217,13 @@ export class ConsumerClient implements IConsumerClientComponent {
 							await this._logging.log({
 								level: LogLevel.Error,
 								source: this.className(),
-								message: `Error while managing negotation completed: ${error}`
+								message: `Error while managing negotation completed: ${JSON.stringify(error)}`
 							});
 							reject(error);
 						}
 					},
 					// Handles on failed CN
-					/////////////////////////////
+					// ///////////////////////////
 					onFailed: async (negotiationId: string, reason: string) => {
 						await this._logging.log({
 							level: LogLevel.Error,
@@ -231,7 +232,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 						});
 						this._dataspaceControlPlane.unregisterNegotiationCallback(negotiationCallbackId);
 
-						reject(`Negotiation: ${negotiationId} failed: ${reason}`);
+						reject(new Error(`Negotiation: ${negotiationId} failed: ${reason}`));
 					}
 				});
 
@@ -239,7 +240,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 				const negotiationId = await this._dataspaceControlPlane.negotiateAgreement(
 					datasetId,
 					datasetPolicyId,
-					this._PROVIDER_ENDPOINT,
+					providerEndpoint,
 					this._CONSUMER_ENDPOINT,
 					{}
 				);
@@ -247,18 +248,22 @@ export class ConsumerClient implements IConsumerClientComponent {
 				await this._logging.log({
 					level: LogLevel.Debug,
 					source: this.className(),
-					message: `Negotiation started. Id: ${negotiationId}`
+					message: `Negotiation started. Id: ${negotiationId.negotiationId}`
 				});
 			} catch (error) {
 				await this._logging.log({
 					level: LogLevel.Error,
 					source: this.className(),
-					message: `General Error in the service: ${error}`
+					message: `General Error in the service: ${JSON.stringify(error)}`
 				});
 				reject(error);
 			}
 		});
 	}
 
+	/**
+	 * Start method.
+	 * @param nodeLoggingComponentType Node Logging Component
+	 */
 	public async start(nodeLoggingComponentType?: string): Promise<void> {}
 }

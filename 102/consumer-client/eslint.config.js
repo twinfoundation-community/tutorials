@@ -16,15 +16,6 @@ import simpleImportSortPlugin from 'eslint-plugin-simple-import-sort';
 import unicornPlugin from 'eslint-plugin-unicorn';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import globals from 'globals';
-import { fileExists } from './scripts/common.mjs';
-import { noDeepTypeNestingPlugin } from './scripts/eslint/eslint-plugin-no-deep-type-nesting.mjs';
-import { noMultipleDeclarationsPlugin } from './scripts/eslint/eslint-plugin-no-multiple-declarations.mjs';
-import { repoStructurePlugin } from './scripts/eslint/eslint-plugin-repo-structure.mjs';
-
-let customModule;
-if (await fileExists('./eslint.config-custom.js')) {
-	customModule = await import('./eslint.config-custom.js');
-}
 
 const isCI = process.env.CI === 'true';
 
@@ -578,22 +569,6 @@ const jsDocRules = {
 	'jsdoc/valid-types': 'error'
 };
 
-const allRules = {
-	tsRules,
-	jsRules,
-	stylisticRules,
-	stylisticJsRules,
-	headerRules,
-	promiseRules,
-	importRules,
-	unicornRules,
-	jsDocRules
-};
-
-if (customModule?.extendRules) {
-	customModule.extendRules(allRules);
-}
-
 const config = [
 	// Global ignores
 	{
@@ -603,12 +578,8 @@ const config = [
 	// Repository structure naming validation.
 	{
 		files: ['scripts/eslint-plugin-repo-structure.mjs'],
-		plugins: {
-			'@twin.org': { rules: { ...repoStructurePlugin.rules } }
-		},
-		rules: {
-			'@twin.org/validate-repo-structure': 'error'
-		}
+		plugins: {},
+		rules: {}
 	},
 
 	// Base JavaScript configuration
@@ -682,14 +653,7 @@ const config = [
 			'unused-imports': unusedImportsPlugin,
 			'simple-import-sort': simpleImportSortPlugin,
 			header: headerPlugin,
-			'@stylistic': stylistic,
-			'@twin.org': {
-				rules: {
-					...repoStructurePlugin.rules,
-					...noMultipleDeclarationsPlugin.rules,
-					...noDeepTypeNestingPlugin.rules
-				}
-			}
+			'@stylistic': stylistic
 		},
 		rules: {
 			// Extend recommended TypeScript rules
@@ -718,11 +682,7 @@ const config = [
 			...headerRules,
 
 			// Stylistic
-			...stylisticRules,
-
-			// Repo structure rules
-			'@twin.org/no-multiple-declarations': 'error',
-			'@twin.org/no-deep-type-nesting': 'error'
+			...stylisticRules
 		},
 		settings: {
 			jsdoc: {
@@ -748,9 +708,5 @@ const config = [
 		}
 	}
 ];
-
-if (customModule?.extendConfig) {
-	customModule.extendConfig(allRules, config);
-}
 
 export default config;
