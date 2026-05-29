@@ -52,7 +52,8 @@ export async function extensionInitialise(
         endpoint:
           "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9",
       },
-    }
+      features: ["remote"],
+    },
   ];
 
   nodeEngineConfig.types.dataspaceDataPlaneComponent = [
@@ -69,6 +70,7 @@ export async function extensionInitialise(
         endpoint:
           "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9",
       },
+      features: ["remote"],
     },
   ];
 }
@@ -130,13 +132,25 @@ export function consumerClientInitialiser(
           {
             loggingComponentType:
               engineCore.getRegisteredInstanceType("loggingComponent"),
+
             dataspaceControlPlaneComponentType:
-              "dataspace-control-plane-service",
-            dataspaceDataPlaneComponentType: "dataspace-data-plane-rest-client",
+              engineCore.getRegisteredInstanceType(
+                "dataspaceControlPlaneComponent",
+              ),
+
             trustComponentType:
               engineCore.getRegisteredInstanceType("trustComponent"),
+
             dataspaceControlPlaneOfDataProviderType:
-              "dataspace-control-plane-rest-client",
+              engineCore.getRegisteredInstanceType(
+                "dataspaceControlPlaneComponent",
+                ["remote"],
+              ),
+            dataspaceDataPlaneComponentType:
+              engineCore.getRegisteredInstanceType(
+                "dataspaceControlPlaneComponent",
+                ["remote"],
+              ),
           },
           createConfig.options,
         ),
