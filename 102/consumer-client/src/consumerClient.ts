@@ -92,11 +92,11 @@ export class ConsumerClient implements IConsumerClientComponent {
         "did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
 
       const token = await this._trustComponent.generate(
-        identity,
+        ids[ContextIdKeys.Node] as string,
         undefined,
         {},
-        ids[ContextIdKeys.Tenant],
-        identity,
+        undefined,
+        ids[ContextIdKeys.Node]
       );
 
       console.log("tttttt", token);
@@ -152,6 +152,9 @@ export class ConsumerClient implements IConsumerClientComponent {
                   },
                   token
                 );
+
+                
+                this._dataspaceControlPlane.
 
               if (
                 transferRequestResult["@type"] ===
