@@ -25,7 +25,7 @@ node src/index.js node-set-identity --identity="did:entity-storage:0x6dd59a28595
 1. Add encryption key to the Node Identity
 
 ```sh
-./twin-node.sh vault-key-create --identity=""did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --key-id="param-encryption" --key-type="ChaCha20Poly1305"
+./twin-node.sh vault-key-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --key-id="param-encryption" --key-type="ChaCha20Poly1305"
 ```
 
 1. Create a tenant
