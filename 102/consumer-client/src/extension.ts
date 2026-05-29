@@ -40,18 +40,18 @@ export async function extensionInitialise(
 
   nodeEngineConfig.types.dataspaceControlPlaneComponent = [
     {
-      type: DataspaceControlPlaneComponentType.RestClient,
-      options: {
-        endpoint:
-          "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9",
-      },
-    },
-    {
       type: DataspaceControlPlaneComponentType.Service,
       options: {
         config: {},
       },
       restPath: "dataspace-control-plane",
+    },
+    {
+      type: DataspaceControlPlaneComponentType.RestClient,
+      options: {
+        endpoint:
+          "http://host.docker.internal:3000?x-api-key=019e70809ae97f3ea6894cb47405bfa0",
+      },
     },
   ];
 
@@ -60,11 +60,11 @@ export async function extensionInitialise(
       type: DataspaceDataPlaneComponentType.RestClient,
       options: {
         endpoint:
-          "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9",
+          "http://host.docker.internal:3000?x-api-key=019e70809ae97f3ea6894cb47405bfa0",
       },
     },
     {
-      type: DataspaceControlPlaneComponentType.Service,
+      type: DataspaceDataPlaneComponentType.Service,
       options: {
         config: {},
       },

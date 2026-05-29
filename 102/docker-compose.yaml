@@ -8,6 +8,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: twin
       MYSQL_USER: twin
       MYSQL_PASSWORD: twin
     healthcheck:

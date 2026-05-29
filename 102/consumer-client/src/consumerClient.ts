@@ -45,7 +45,7 @@ export class ConsumerClient implements IConsumerClientComponent {
   private _OFFER_ID = "urn:policy:test-policy-offer-1";
 
   private _PROVIDER_ENDPOINT =
-    "http://host.docker.internal:3000/rights-management?x-api-key=019e5ee3ad5f7e94a197735372d895a9";
+    "http://host.docker.internal:3000/rights-management?x-api-key=019e70809ae97f3ea6894cb47405bfa0";
 
   private _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
   /* /rights-management?x-api-key=019e5f84a1657dd88e76e1f158abcda2*/
@@ -87,15 +87,17 @@ export class ConsumerClient implements IConsumerClientComponent {
       const ids = (await ContextIdStore.getContextIds()) as IContextIds;
       console.log("IDs", ids);
 
-      // Workaround until we get the organization identity
-      const identity =
-        "did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
+      // Use the node identity from the current context (the same identity
+      // that drove the negotiation), so the agreement's assignee matches.
+      // Omit tenant from the trust token so buildCallerComposite returns
+      // just the DID (the assignee is stored without a tenant suffix).
+      const identity = ids[ContextIdKeys.Node]!;
 
       const token = await this._trustComponent.generate(
         identity,
         undefined,
         {},
-        ids[ContextIdKeys.Tenant],
+        undefined,
         identity,
       );
 
@@ -146,7 +148,7 @@ export class ConsumerClient implements IConsumerClientComponent {
                     agreementId: agreementId,
                     consumerPid: `urn:uuid:${randomUUID()}`,
                     callbackAddress:
-                      "http://host.docker.internal:3000/dataspace?x-api-key=019e5f84a1657dd88e76e1f158abcda2",
+                      "http://host.docker.internal:3000/dataspace?x-api-key=019e7080a7ec7d8ca6a26694f4a8e952",
 
                     format: "twin:Http-Pull-Query-Format",
                   },
