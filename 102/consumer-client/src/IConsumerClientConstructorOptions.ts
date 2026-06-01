@@ -35,4 +35,9 @@ export interface IConsumerClientConstructorOptions {
 	 * Federated Catalogue Component Type
 	 */
 	federatedCatalogueComponentType?: string;
+
+	/**
+	 * Transfer Process Entity Storage Type
+	 */
+	transferProcessEntityStorageType?: string;
 }

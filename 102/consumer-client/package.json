@@ -31,7 +31,8 @@
 		"@twin.org/nameof": "next",
 		"@twin.org/standards-dataspace-protocol": "next",
 		"@twin.org/trust-models": "next",
-		"@twin.org/federated-catalogue-models": "next"
+		"@twin.org/federated-catalogue-models": "next",
+		"@twin.org/entity-storage-models": "next"
 	},
 	"devDependencies": {
 		"@twin.org/nameof-transformer": "next",

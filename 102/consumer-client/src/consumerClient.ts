@@ -7,13 +7,20 @@
 
 import { randomUUID } from "node:crypto";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
-import { ComponentFactory, Is } from "@twin.org/core";
-import type {
-	IDataspaceControlPlaneComponent,
-	IDataspaceDataPlaneComponent
+import { ComponentFactory, Converter, Is, RandomHelper } from "@twin.org/core";
+import {
+	DataspaceTransferFormat,
+	type IDataspaceControlPlaneComponent,
+	type IDataspaceDataPlaneComponent,
+	type TransferProcess
 } from "@twin.org/dataspace-models";
+import {
+	EntityStorageConnectorFactory,
+	type IEntityStorageConnector
+} from "@twin.org/entity-storage-models";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
+import { nameofKebabCase } from "@twin.org/nameof";
 import {
 	DataspaceProtocolCatalogTypes,
 	DataspaceProtocolContexts,
@@ -51,6 +58,8 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
 
+	private readonly _transferProcessStorage: IEntityStorageConnector<TransferProcess>;
+
 	/**
 	 * Create a new instance.
 	 * @param options The constructor options.
@@ -82,6 +91,10 @@ export class ConsumerClient implements IConsumerClientComponent {
 		this._federatedCatalogue = ComponentFactory.get<IFederatedCatalogueComponent>(
 			options?.federatedCatalogueComponentType ?? "federatedCatalogue"
 		);
+
+		this._transferProcessStorage = EntityStorageConnectorFactory.get<
+			IEntityStorageConnector<TransferProcess>
+		>(options?.transferProcessEntityStorageType ?? nameofKebabCase<TransferProcess>());
 	}
 
 	public className(): string {
@@ -130,8 +143,11 @@ export class ConsumerClient implements IConsumerClientComponent {
 				});
 
 				// Workaround until we get the organization identity
-				const identity =
+				const consumerIdentity =
 					"did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
+
+				const providerIdentity =
+					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
 
 				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
 				const token = await this._trustComponent.generate(
@@ -175,17 +191,20 @@ export class ConsumerClient implements IConsumerClientComponent {
 						});
 
 						try {
+							const consumerPid = `urn:uuid:${randomUUID()}`;
+							const format = DataspaceTransferFormat.HttpProxyPull;
+
 							// Now we start the Data Transfer
 							const transferRequestResult = await this._providerControlPlane.requestTransfer(
 								{
 									"@context": [DataspaceProtocolContexts.Context],
 									"@type": DataspaceProtocolTransferProcessTypes.TransferRequestMessage,
 									agreementId,
-									consumerPid: `urn:uuid:${randomUUID()}`,
+									consumerPid,
 									callbackAddress:
 										"http://host.docker.internal:3000/dataspace-control-plane?x-api-key=019e5f84a1657dd88e76e1f158abcda2",
 
-									format: "twin:Http-Pull-Query-Format"
+									format
 								},
 								token
 							);
@@ -194,23 +213,38 @@ export class ConsumerClient implements IConsumerClientComponent {
 								transferRequestResult["@type"] ===
 								DataspaceProtocolTransferProcessTypes.TransferError
 							) {
-								const transferError = transferRequestResult;
 								await this._logging.log({
 									level: LogLevel.Error,
-									message: `Transfer Process Error: reason: ${JSON.stringify(transferError.reason)}`,
+									message: `Transfer Process Error: reason: ${JSON.stringify(transferRequestResult.reason)}`,
 									source: this.className()
 								});
-								reject(transferError.reason);
+								reject(transferRequestResult.reason);
 								return;
 							}
 
-							const transferResponse = transferRequestResult;
 							await this._logging.log({
 								level: LogLevel.Debug,
-								message: `Transfer Process created. State: ${transferResponse.state}, 
-                                        Provider Pid: ${transferResponse.providerPid}, Consumer Pid: ${transferResponse.consumerPid}`,
+								message: `Transfer Process created. State: ${transferRequestResult.state}, 
+                                        Provider Pid: ${transferRequestResult.providerPid}, Consumer Pid: ${transferRequestResult.consumerPid}`,
 								source: this.className()
 							});
+
+							const transferProcess: TransferProcess = {
+								consumerPid,
+								providerPid: transferRequestResult.providerPid,
+								state: transferRequestResult.state,
+								agreementId,
+								dateCreated: new Date().toISOString(),
+								dateModified: new Date().toISOString(),
+								datasetId,
+								offerId: datasetPolicyId,
+								id: Converter.bytesToHex(RandomHelper.generate(32)),
+								providerIdentity,
+								format
+							};
+							await this._transferProcessStorage.set(transferProcess);
+
+							// Call the provider endpoint
 
 							resolve({});
 						} catch (error) {
