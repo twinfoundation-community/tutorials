@@ -8,7 +8,7 @@
 
 ## Bootstrap Howto
 
-See [Bootstrap Recipes](./HOWTO-bootstrap-node.md)
+This tutorial uses the so called legacy-bootstrap process. For understanding the step by step bootstrap please see [Bootstrap Recipes](../../common/HOWTO-bootstrap-node.md).
 
 ## Troubleshooting
 

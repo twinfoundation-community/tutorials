@@ -29,10 +29,10 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
-    env_file: ./.env.local
+    env_file: ../../common/.env.local
     volumes: 
       - twin_data:/var/lib/twin
-      - ./.env.local.bootstrap:/app/.env.local.bootstrap
+      - ../../common/.env.local.bootstrap:/app/.env.local.bootstrap
       - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
       - ./consumer-client:/app/node_modules/@twin-community.org/consumer-client
       - ./provider.json:/app/provider.json
