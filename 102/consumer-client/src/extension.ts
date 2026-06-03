@@ -184,7 +184,7 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 				type: "unknown",
 				examples: []
 			}
-		],
+		]
 		// skipAuth: true,
 		// skipTenant: true
 	};
