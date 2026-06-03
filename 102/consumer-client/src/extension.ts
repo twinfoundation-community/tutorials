@@ -185,7 +185,8 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 				examples: []
 			}
 		],
-		skipAuth: true
+		// skipAuth: true,
+		// skipTenant: true
 	};
 
 	return [consumerClientRoute];

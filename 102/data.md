@@ -13,8 +13,8 @@ Tenant 1: (Data Provider)
 ```sh
 ➡️  Creating tenant
 
-Tenant ID: 019e5ee3ad60770b897ee38b615ec6f0
-API Key: 019e5ee3ad5f7e94a197735372d895a9
+Tenant ID: 019e8c88a4fa77fc89a6334731fa30cd
+API Key: 019e8c88a4fa70408a291977891260d3
 Label:
 Public Origin:
 ```
@@ -22,8 +22,8 @@ Public Origin:
 Tenant 2: (Data Consumer)
 
 ```sh
-Tenant ID: 019e5f84a1667fb28ec204938d50a619
-API Key: 019e5f84a1657dd88e76e1f158abcda2
+Tenant ID: 019e8c89185578118f3c165bde255ce9
+API Key: 019e8c8918547bda894c44b4ab614265
 Label:
 Public Origin:
 ```
@@ -41,7 +41,7 @@ did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3b
 User Identity:
 
 ```sh
- did:entity-storage:0x25382b99dd20ca68e76ff378e8cde2247cbd9ea256e805d1dd2975aef632e4c8
+did:entity-storage:0x25382b99dd20ca68e76ff378e8cde2247cbd9ea256e805d1dd2975aef632e4c8
 ```
 
 Login:
@@ -49,6 +49,12 @@ Login:
 ```sh
 Email: jcantera@example.com
 Password: yM5?NgPPAio+TmWx
+```
+
+Command line:
+
+```sh
+./twin-node.sh  user-create --user-identity="did:entity-storage:0x25382b99dd20ca68e76ff378e8cde2247cbd9ea256e805d1dd2975aef632e4c8" --organization-identity="did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f" --email="jcantera@example.com" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019e8c88a4fa77fc89a6334731fa30cd"
 ```
 
 ### Organization 2 (Data Consumer)
@@ -70,6 +76,12 @@ Login:
 ```sh
 Email: damon@example.org
 Password: yM5?NgPPAio+TmWx
+```
+
+Command line:
+
+```sh
+/twin-node.sh  user-create --user-identity="did:entity-storage:0xd9096602b0d2c4ab435bf588d7a49ac49017f50d77d5264a5a6346a591b84454" --organization-identity="did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431" --email="damon@example.org" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019e8c89185578118f3c165bde255ce9"
 ```
 
 ## Verifiable Credential Creation

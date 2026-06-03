@@ -38,8 +38,6 @@ import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstru
  * Test App Activity Handler.
  */
 export class ConsumerClient implements IConsumerClientComponent {
-	private readonly _DATASET_ID = "https://twin.example.org/dataset-1342";
-
 	private readonly _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
 	/* /rights-management?x-api-key=019e5f84a1657dd88e76e1f158abcda2*/
 
@@ -110,10 +108,12 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 				// Query the federated Catalogue
 				const datasets = await this._federatedCatalogue.query([
+					/*
 					{
 						"@type": "FilterByExample",
 						"dcterms:type": this._DATASET_TYPE
 					}
+					*/
 				]);
 
 				const result = datasets.result;
@@ -122,14 +122,17 @@ export class ConsumerClient implements IConsumerClientComponent {
 					return;
 				}
 				const catalog = result;
-				if (!Is.arrayValue(catalog.dataset)) {
+				if (!Is.arrayValue(catalog.catalog)) {
+					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
+					return;
+				}
+				if (!Is.arrayValue(catalog.catalog[0].dataset)) {
 					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
 					return;
 				}
 
-				const dataset = catalog.dataset[0];
-				// Workaround to deal with a Fed  Cat query issue
-				const datasetId = dataset["@id"] ?? this._DATASET_ID;
+				const dataset = catalog.catalog[0].dataset[0];
+				const datasetId = dataset["@id"];
 				const datasetPolicyId = dataset.hasPolicy[0]["@id"];
 
 				const providerEndpoint = (
@@ -143,19 +146,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 				});
 
 				// Workaround until we get the organization identity
-				const consumerIdentity =
-					"did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
+				const consumerIdentity = ids[ContextIdKeys.Organization];
 
 				const providerIdentity =
 					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
 
 				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
 				const token = await this._trustComponent.generate(
-					ids[ContextIdKeys.Node] as string,
+					ids[ContextIdKeys.Organization] as string,
 					undefined,
 					{},
-					undefined,
-					ids[ContextIdKeys.Node]
+					ids[ContextIdKeys.Tenant],
+					ids[ContextIdKeys.Organization]
 				);
 
 				console.log("tttttt", token);

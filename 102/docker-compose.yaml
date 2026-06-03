@@ -22,7 +22,7 @@ services:
       - mysql_data:/var/lib/mysql
 
   twin-node:
-    image: twinfoundation/twin-node:0.0.3-next.43
+    image: twinfoundation/twin-node:0.0.3-next.45
     container_name: twin_node
     depends_on:
       db:
