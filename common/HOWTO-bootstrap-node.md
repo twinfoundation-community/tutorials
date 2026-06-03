@@ -1,5 +1,7 @@
 # Steps to bootstrap a Node
 
+Note: The alternative to these recipes is to use the so called "legacy bootstrap method" as described by [Tutorial 101](../tutorials/101/).
+
 1. Create a Decentralized Identity for the Node
 
 ```sh
