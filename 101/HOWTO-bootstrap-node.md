@@ -1,6 +1,6 @@
 # Steps to bootstrap a Node
 
-1. Create an Identity for the Node
+1. Create a Decentralized Identity for the Node
 
 ```sh
 node src/index.js identity-create --load-env=./.env.local.bootstrap
@@ -8,11 +8,21 @@ node src/index.js identity-create --load-env=./.env.local.bootstrap
 
 1. Add verification methods for the Node's Identity
 
+This verification method is for signing proofs.
+
 ```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
+```
 
+This verification method is for the Node to sign authentication JWT tokens.
+
+```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="auth-signing"  --load-env=./.env.local.bootstrap
+```
 
+This verification method is for authentication as data provider or consumer in Dataspace exchanges.
+
+```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --verification-method-id="trust-assertion"  --load-env=./.env.local.bootstrap
 ```
 
@@ -23,6 +33,8 @@ node src/index.js node-set-identity --identity="did:entity-storage:0x6dd59a28595
 ```
 
 1. Add encryption key to the Node Identity
+
+This encryption key is used to encrypt API keys so they are not clearly disclosed when sharing callback endpoints in the Dataspace protocol.
 
 ```sh
 ./twin-node.sh vault-key-create --identity="did:entity-storage:0x6dd59a2859572904e0516d060af7427059630f122bd452ac0418b2094d2f0e68" --key-id="param-encryption" --key-type="ChaCha20Poly1305"
@@ -53,7 +65,11 @@ node src/index.js node-set-tenant --tenant-id="019e4a73a13b77f5989cec15a466cc71"
 
 ```sh
 node src/index.js identity-create --load-env=./.env.local.bootstrap
+```
 
+This verification method can be used to sign proofs for data verifiability purposes.
+
+```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0xf53d09732675c67f83ee3894e013b8244f543f3148c6ceca53367a93dec984bb" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
 ```
 
@@ -67,11 +83,17 @@ In order to sign JWTs in data exchange operations it is needed to created an ass
 
 ```sh
 node src/index.js identity-create --load-env=./.env.local.bootstrap
+```
 
+Although not strictly necessary a verification method is added for the user. 
+
+```sh
 node src/index.js identity-verification-method-create --identity="did:entity-storage:0x56a70c43e443f75804405482ee4e347a1f9c2b156b56a7ad299fb298330ae491" --verification-method-id="sign-0"  --load-env=./.env.local.bootstrap
 ```
 
 1. Create User with login and pass
+
+This login and pass will allow to generate authentication tokens for regular Node services (not Dataexchange operations).
 
 ```sh
 node src/index.js user-create --user-identity="did:entity-storage:0x56a70c43e443f75804405482ee4e347a1f9c2b156b56a7ad299fb298330ae491" --organization-identity="did:entity-storage:0xf53d09732675c67f83ee3894e013b8244f543f3148c6ceca53367a93dec984bb" --email="jcantera@example.com" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019e4a73a13b77f5989cec15a466cc71" --load-env=./.env.local.bootstrap
