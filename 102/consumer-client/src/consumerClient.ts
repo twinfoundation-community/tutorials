@@ -33,7 +33,6 @@ import {
 import type { ITrustComponent } from "@twin.org/trust-models";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
-import { IUrlTransformerComponent } from "@twin.org/api-models";
 
 /**
  * Test App Activity Handler.
