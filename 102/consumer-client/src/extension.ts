@@ -1,6 +1,11 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
-import type { IHttpRequestContext, IRestRoute } from "@twin.org/api-models";
+import type {
+	IHttpRequestContext,
+	IRestRoute,
+	ITenantAdminComponent,
+	IUrlTransformerComponent
+} from "@twin.org/api-models";
 import { ComponentFactory } from "@twin.org/core";
 import type {
 	EngineTypeInitialiserReturn,
@@ -42,14 +47,16 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.Service,
 			options: {
-				config: {}
+				config: {
+					dataPlanePath: (envVars.dataspaceDataPlanePath as string) ?? "dataspace/entities"
+				}
 			},
 			restPath: "dataspace-control-plane"
 		},
 		{
 			type: DataspaceControlPlaneComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9"
+				endpoint: "http://host.docker.internal:3000?x-api-key=019e84e483d07390a3a37052d35f88ef"
 			},
 			features: ["remote"]
 		}
@@ -57,7 +64,7 @@ export async function extensionInitialise(
 
 	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
 		{
-			type: DataspaceControlPlaneComponentType.Service,
+			type: DataspaceDataPlaneComponentType.Service,
 			options: {
 				config: {}
 			},
@@ -66,7 +73,7 @@ export async function extensionInitialise(
 		{
 			type: DataspaceDataPlaneComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9"
+				endpoint: "http://host.docker.internal:3000?x-api-key=019e84e483d07390a3a37052d35f88ef"
 			},
 			features: ["remote"]
 		}
@@ -167,6 +174,13 @@ export function consumerClientInitialiser(
  * @returns The rest routes.
  */
 export function generateRestRoutes(baseRouteName: string, componentName: string): IRestRoute[] {
+	// PLATFORM-CATCHUP: dropped `skipAuth: true` from this route. Post api-service
+	// #140 ("tenant id in jwt") the TenantProcessor only accepts `?x-api-key=` on
+	// `/login`; any other route marked `skipAuth: true` AND missing
+	// `x-enc-tenant-token` in the URL is auto-rejected with
+	// `tenantProcessor.missingTenantToken`. Removing skipAuth lets the auth chain
+	// resolve the tenant from the session JWT's `tid` claim — works on this route
+	// because Postman can pass the session cookie / Bearer.
 	const consumerClientRoute: IRestRoute<{ body: unknown }, { body: unknown }> = {
 		operationId: "consumerClient",
 		summary: "Get Data",
@@ -184,11 +198,52 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 				type: "unknown",
 				examples: []
 			}
-		],
-		skipAuth: true
+		]
 	};
 
-	return [consumerClientRoute];
+	// PLATFORM-CATCHUP: NEW endpoint, tutorial-only scaffolding. Postman is a naked
+	// HTTP client and can't reach `urlTransformerComponent.addEncryptedQueryParamToUrl`
+	// directly, so it has no way to mint the `x-enc-tenant-token` that PNP /
+	// dataspace-control-plane skipAuth routes now require. This helper mints one
+	// in-process so the operator can stash it in `prov_tenant_token` /
+	// `cons_tenant_token` env vars and use it on C5, C-poll, etc.
+	//
+	// DO NOT SHIP TO PRODUCTION. In production the provider's catalogue bakes the
+	// token into distribution URLs at registration time; nobody outside the
+	// platform should ever be able to mint a tenant token for an arbitrary api-key.
+	const mintTenantTokenRoute: IRestRoute<
+		{ query: { apiKey: string } },
+		{ body: { token: string } }
+	> = {
+		operationId: "mintTenantToken",
+		summary:
+			"Mint an x-enc-tenant-token for the tenant identified by `apiKey`. Use for hand-driven Postman calls to skipAuth routes (PNP / dataspace-control-plane) where the platform expects the encrypted token, not the api-key.",
+		method: "GET",
+		tag: "client",
+		path: `${baseRouteName}/mint-tenant-token`,
+		handler: async (_httpRequestContext, request) => {
+			const apiKey = request?.query?.apiKey;
+			if (typeof apiKey !== "string" || apiKey.length === 0) {
+				throw new Error("apiKey query param is required");
+			}
+			const tenantAdmin = ComponentFactory.get<ITenantAdminComponent>("tenant-admin-service");
+			const urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
+				"url-transformer-service"
+			);
+			const tenant = await tenantAdmin.getByApiKey(apiKey);
+			const stamped = await urlTransformer.addEncryptedQueryParamToUrl(
+				"http://placeholder/",
+				"tenant",
+				tenant.id
+			);
+			const token = new URL(stamped).searchParams.get("x-enc-tenant-token") ?? "";
+			return { body: { token } };
+		},
+		requestType: { type: "unknown", examples: [] },
+		responseType: [{ type: "unknown", examples: [] }]
+	};
+
+	return [consumerClientRoute, mintTenantTokenRoute];
 }
 
 /**

@@ -40,4 +40,21 @@ export interface IConsumerClientConstructorOptions {
 	 * Transfer Process Entity Storage Type
 	 */
 	transferProcessEntityStorageType?: string;
+
+	// PLATFORM-CATCHUP: post twin-node next.45 the consumer-client needs in-process
+	// access to the URL transformer + tenant admin so it can mint x-enc-tenant-token
+	// for cross-tenant URLs (PNP + dataspace-control-plane routes are skipAuth and
+	// only accept the encrypted token, not x-api-key, on non-/login paths).
+
+	/**
+	 * URL transformer component type.
+	 * @default url-transformer-service
+	 */
+	urlTransformerComponentType?: string;
+
+	/**
+	 * Tenant admin component type.
+	 * @default tenant-admin-service
+	 */
+	tenantAdminComponentType?: string;
 }
