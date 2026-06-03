@@ -15,3 +15,7 @@ For example to create a tenant:
 ```sh
 ./twin-node.sh tenant-create
 ```
+
+## Tutorial data
+
+[Tutorial Data Link](./data.md)
