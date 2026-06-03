@@ -8,7 +8,7 @@ You can use:
 twin-node.sh <bootstrap_command> 
 ```
 
-to execute the bootstrap commands specified by [tutorial 101](../101/HOWTO-bootstrap-node.md).
+to execute the bootstrap commands specified by [the step by step bootstrapping](../../common/HOWTO-bootstrap-node.md).
 
 For example to create a tenant:
 

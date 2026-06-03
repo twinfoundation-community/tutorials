@@ -2,3 +2,7 @@
 
 * [101 - Docker Setup](./tutorials/101/)
 * [102 - Dataspace App](./tutorials/102/)
+
+## Common Resources
+
+[Folder Link](./common/)
