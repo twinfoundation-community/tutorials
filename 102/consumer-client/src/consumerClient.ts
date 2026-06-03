@@ -146,18 +146,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 				});
 
 				// Workaround until we get the organization identity
-				const consumerIdentity = ids[ContextIdKeys.Organization];
+				const consumerIdentity = ids[ContextIdKeys.Organization] as string;
 
 				const providerIdentity =
 					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
 
 				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
 				const token = await this._trustComponent.generate(
-					ids[ContextIdKeys.Organization] as string,
+					consumerIdentity,
 					undefined,
 					{},
 					ids[ContextIdKeys.Tenant],
-					ids[ContextIdKeys.Organization]
+					consumerIdentity
 				);
 
 				console.log("tttttt", token);
