@@ -5,7 +5,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import type { ITenantAdminComponent, IUrlTransformerComponent } from "@twin.org/api-models";
+import type { IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
 import { ComponentFactory, Is } from "@twin.org/core";
 import {
@@ -52,8 +52,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _urlTransformer: IUrlTransformerComponent;
 
-	private readonly _tenantAdmin: ITenantAdminComponent;
-
 	/**
 	 * Create a new instance.
 	 * @param options The constructor options.
@@ -86,10 +84,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
 			options?.urlTransformerComponentType ?? "url-transformer-service"
-		);
-
-		this._tenantAdmin = ComponentFactory.get<ITenantAdminComponent>(
-			options?.tenantAdminComponentType ?? "tenant-admin-service"
 		);
 	}
 
@@ -222,12 +216,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 								onTerminated: async (consumerPid: string, reason?: string) => {}
 							});
 
-							const providerEndpointTransfer = "";
-							const consumerCallback = "";
-							const consumerPid = await this._dataspaceControlPlane.startDataTransfer(
+							const providerEndpointTransfer = new URL(providerEndpoint);
+							providerEndpointTransfer.pathname += "/dataspace-control-plane";
+							const consumerTransferCallback =
+								await this._urlTransformer.addEncryptedQueryParamToUrl(
+									`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
+									"tenant",
+									ids[ContextIdKeys.Tenant] as string
+								);
+							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
 								agreementId,
-								providerEndpointTransfer,
-								consumerCallback,
+								providerEndpointTransfer.toString(),
+								consumerTransferCallback,
 								format,
 								token
 							);
@@ -235,7 +235,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 							await this._logging.log({
 								level: LogLevel.Debug,
 								source: this.className(),
-								message: `Transfer Process started. Consumer Pid: ${consumerPid}`
+								message: `Transfer Process Initiated. Consumer Pid: ${transferResult.consumerPid}`
 							});
 
 							resolve({});
@@ -301,21 +301,4 @@ export class ConsumerClient implements IConsumerClientComponent {
 	 * @param nodeLoggingComponentType Node Logging Component
 	 */
 	public async start(nodeLoggingComponentType?: string): Promise<void> {}
-
-	/**
-	 * Transform a catalogue distribution URL from `?x-api-key=...` shape to
-	 * `?x-enc-tenant-token=...` shape so post-#140 TenantProcessor will route it.
-	 * @param url The provider endpoint URL as discovered from the catalogue.
-	 * @returns The transformed URL with `x-enc-tenant-token` and no `x-api-key`.
-	 */
-	private async _toTenantTokenUrl(url: string): Promise<string> {
-		const u = new URL(url);
-		const apiKey = u.searchParams.get("x-api-key");
-		if (!Is.stringValue(apiKey)) {
-			return url;
-		}
-		const tenant = await this._tenantAdmin.getByApiKey(apiKey);
-		u.searchParams.delete("x-api-key");
-		return this._urlTransformer.addEncryptedQueryParamToUrl(u.toString(), "tenant", tenant.id);
-	}
 }
