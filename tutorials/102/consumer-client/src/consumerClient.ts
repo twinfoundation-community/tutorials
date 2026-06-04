@@ -41,8 +41,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _dataspaceControlPlane: IDataspaceControlPlaneComponent;
 
-	private readonly _providerControlPlane: IDataspaceControlPlaneComponent;
-
 	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
 	private readonly _providerDataPlane: IDataspaceDataPlaneComponent;
 
@@ -71,11 +69,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 		this._trustComponent = ComponentFactory.get<ITrustComponent>(
 			options?.trustComponentType ?? "trust"
-		);
-
-		this._providerControlPlane = ComponentFactory.get<IDataspaceControlPlaneComponent>(
-			options?.dataspaceControlPlaneOfDataProviderComponentType ??
-				"dataspaceControlPlaneOfDataProvider"
 		);
 
 		this._federatedCatalogue = ComponentFactory.get<IFederatedCatalogueComponent>(
@@ -217,7 +210,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 							});
 
 							const providerEndpointTransfer = new URL(providerEndpoint);
-							providerEndpointTransfer.pathname += "/dataspace-control-plane";
+							providerEndpointTransfer.pathname += "dataspace-control-plane";
 							const consumerTransferCallback =
 								await this._urlTransformer.addEncryptedQueryParamToUrl(
 									`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
