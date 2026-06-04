@@ -101,8 +101,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 					*/
 				]);
 
-				this._dataspaceControlPlane.startTransfer()
-
 				const result = datasets.result;
 				if (result["@type"] === DataspaceProtocolCatalogTypes.CatalogError) {
 					reject(result);
