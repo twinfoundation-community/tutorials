@@ -11,4 +11,4 @@ bootstrap_env='--load-env=./.env.local.bootstrap'
 final_command="$command $* $bootstrap_env"
 
 
-docker compose -f ../tutorials/102/docker-compose.yaml run --rm -it twin-node sh -c "${final_command}"
+docker compose run --rm -it twin-node sh -c "${final_command}"
