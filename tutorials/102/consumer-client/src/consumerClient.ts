@@ -5,31 +5,24 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import { randomUUID } from "node:crypto";
 import type { ITenantAdminComponent, IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
-import { ComponentFactory, Converter, Is, RandomHelper } from "@twin.org/core";
+import { ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
 	type IDataspaceControlPlaneComponent,
-	type IDataspaceDataPlaneComponent,
-	type TransferProcess
+	type IDataspaceDataPlaneComponent
 } from "@twin.org/dataspace-models";
-import {
-	EntityStorageConnectorFactory,
-	type IEntityStorageConnector
-} from "@twin.org/entity-storage-models";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
-import { nameofKebabCase } from "@twin.org/nameof";
 import {
 	DataspaceProtocolCatalogTypes,
-	DataspaceProtocolContexts,
 	type DataspaceProtocolContractNegotiationStateType,
-	DataspaceProtocolTransferProcessTypes,
+	type DataspaceProtocolTransferProcessStateType,
 	type IDataspaceProtocolAgreement,
 	type IDataspaceProtocolDataService,
-	type IDataspaceProtocolOffer
+	type IDataspaceProtocolOffer,
+	type IDataspaceProtocolTransferStartMessage
 } from "@twin.org/standards-dataspace-protocol";
 import type { ITrustComponent } from "@twin.org/trust-models";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
@@ -57,8 +50,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
 
-	private readonly _transferProcessStorage: IEntityStorageConnector<TransferProcess>;
-
 	private readonly _urlTransformer: IUrlTransformerComponent;
 
 	private readonly _tenantAdmin: ITenantAdminComponent;
@@ -68,8 +59,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 	 * @param options The constructor options.
 	 */
 	constructor(options?: IConsumerClientConstructorOptions) {
-		console.log(ComponentFactory.names());
-
 		this._dataspaceControlPlane = ComponentFactory.get<IDataspaceControlPlaneComponent>(
 			options?.dataspaceControlPlaneComponentType ?? "dataspaceControlPlane"
 		);
@@ -95,10 +84,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 			options?.federatedCatalogueComponentType ?? "federatedCatalogue"
 		);
 
-		this._transferProcessStorage = EntityStorageConnectorFactory.get<
-			IEntityStorageConnector<TransferProcess>
-		>(options?.transferProcessEntityStorageType ?? nameofKebabCase<TransferProcess>());
-
 		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
 			options?.urlTransformerComponentType ?? "url-transformer-service"
 		);
@@ -115,7 +100,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 	public async getData(): Promise<unknown> {
 		// eslint-disable-next-line no-async-promise-executor
 		return new Promise<unknown>(async (resolve, reject) => {
-			console.log("Hereeeeeeee")
 			try {
 				const ids = (await ContextIdStore.getContextIds()) as IContextIds;
 				console.log("IDs", ids);
@@ -174,8 +158,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 					consumerIdentity
 				);
 
-				console.log("tttttt", token);
-
 				const negotiationCallbackId = `negotiation-${new Date().toISOString()}`;
 
 				this._dataspaceControlPlane.registerNegotiationCallback(negotiationCallbackId, {
@@ -197,7 +179,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 					},
 					// Handles on completed CN
 					// ///////////////////////////
-					onCompleted: async (negotiationId: string, agreementId: string) => {
+					onFinalized: async (negotiationId: string, agreementId: string) => {
 						this._dataspaceControlPlane.unregisterNegotiationCallback(negotiationCallbackId);
 
 						await this._logging.log({
@@ -207,60 +189,54 @@ export class ConsumerClient implements IConsumerClientComponent {
 						});
 
 						try {
-							const consumerPid = `urn:uuid:${randomUUID()}`;
-							const format = DataspaceTransferFormat.HttpProxyPull;
+							const format = DataspaceTransferFormat.HttpDataPull;
 
-							// Now we start the Data Transfer
-							const transferRequestResult = await this._providerControlPlane.requestTransfer(
-								{
-									"@context": [DataspaceProtocolContexts.Context],
-									"@type": DataspaceProtocolTransferProcessTypes.TransferRequestMessage,
-									agreementId,
-									consumerPid,
-									callbackAddress:
-										"http://host.docker.internal:3000/dataspace-control-plane?x-api-key=019e5f84a1657dd88e76e1f158abcda2",
-
-									format
+							const transferCallbackId = `transfer-${new Date().toISOString()}`;
+							this._dataspaceControlPlane.registerTransferCallback(transferCallbackId, {
+								onStarted: async (
+									consumerPid: string,
+									message: IDataspaceProtocolTransferStartMessage
+								) => {
+									await this._logging.log({
+										level: LogLevel.Debug,
+										message: `TransferProcess: ${consumerPid} Now started`,
+										source: this.className()
+									});
+									// Retrieve the data
 								},
+								onStateChanged: async (
+									consumerPid: string,
+									state: DataspaceProtocolTransferProcessStateType
+								) => {
+									await this._logging.log({
+										level: LogLevel.Debug,
+										message: `TransferProcess: ${consumerPid} Now in state: ${state}`,
+										source: this.className()
+									});
+								},
+
+								onCompleted: async (consumerPid: string) => {},
+
+								onSuspended: async (consumerPid: string, reason?: string) => {},
+
+								onTerminated: async (consumerPid: string, reason?: string) => {}
+							});
+
+							const providerEndpointTransfer = "";
+							const consumerCallback = "";
+							const consumerPid = await this._dataspaceControlPlane.startDataTransfer(
+								agreementId,
+								providerEndpointTransfer,
+								consumerCallback,
+								format,
 								token
 							);
 
-							if (
-								transferRequestResult["@type"] ===
-								DataspaceProtocolTransferProcessTypes.TransferError
-							) {
-								await this._logging.log({
-									level: LogLevel.Error,
-									message: `Transfer Process Error: reason: ${JSON.stringify(transferRequestResult.reason)}`,
-									source: this.className()
-								});
-								reject(transferRequestResult.reason);
-								return;
-							}
-
 							await this._logging.log({
 								level: LogLevel.Debug,
-								message: `Transfer Process created. State: ${transferRequestResult.state}, 
-                                        Provider Pid: ${transferRequestResult.providerPid}, Consumer Pid: ${transferRequestResult.consumerPid}`,
-								source: this.className()
+								source: this.className(),
+								message: `Transfer Process started. Consumer Pid: ${consumerPid}`
 							});
-
-							const transferProcess: TransferProcess = {
-								consumerPid,
-								providerPid: transferRequestResult.providerPid,
-								state: transferRequestResult.state,
-								agreementId,
-								dateCreated: new Date().toISOString(),
-								dateModified: new Date().toISOString(),
-								datasetId,
-								offerId: datasetPolicyId,
-								id: Converter.bytesToHex(RandomHelper.generate(32)),
-								providerIdentity,
-								format
-							};
-							await this._transferProcessStorage.set(transferProcess);
-
-							// Call the provider endpoint
 
 							resolve({});
 						} catch (error) {
@@ -286,12 +262,21 @@ export class ConsumerClient implements IConsumerClientComponent {
 					}
 				});
 
+				const consumerCallbackAddress = await this._urlTransformer.addEncryptedQueryParamToUrl(
+					`${this._CONSUMER_ENDPOINT}/rights-management`,
+					"tenant",
+					ids[ContextIdKeys.Tenant] as string
+				);
+
+				const negotiationProviderEndpoint = new URL(providerEndpoint);
+				negotiationProviderEndpoint.pathname += "rights-management";
+
 				// Everything starts with a Contract Negotiation
 				const negotiationId = await this._dataspaceControlPlane.negotiateAgreement(
 					datasetId,
 					datasetPolicyId,
-					providerEndpoint,
-					this._CONSUMER_ENDPOINT,
+					negotiationProviderEndpoint.toString(),
+					consumerCallbackAddress,
 					token
 				);
 
