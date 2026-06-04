@@ -1,7 +1,8 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
+import type { IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdHelper, ContextIdKeys, ContextIdStore } from "@twin.org/context";
-import { ComponentFactory, Guards } from "@twin.org/core";
+import { ArrayHelper, ComponentFactory, Guards } from "@twin.org/core";
 import { DataTypeHandlerFactory } from "@twin.org/data-core";
 import type { IJsonLdDocument } from "@twin.org/data-json-ld";
 import {
@@ -14,6 +15,10 @@ import {
 } from "@twin.org/dataspace-models";
 import type { ILoggingComponent } from "@twin.org/logging-models";
 import { nameof } from "@twin.org/nameof";
+import type {
+	IDataspaceProtocolDataService,
+	IDataspaceProtocolDataset
+} from "@twin.org/standards-dataspace-protocol";
 import type { IActivityStreamsActivity } from "@twin.org/standards-w3c-activity-streams";
 import type { ITestAppConstructorOptions } from "./ITestAppConstructorOptions.js";
 
@@ -95,6 +100,12 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	private readonly _logging?: ILoggingComponent;
 
 	/**
+	 * URL Transformer.
+	 * @internal
+	 */
+	private readonly _urlTransformer: IUrlTransformerComponent;
+
+	/**
 	 * Consignment documents served by this app.
 	 * @internal
 	 */
@@ -115,6 +126,10 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 			options?.loggingComponentType ?? "logging"
 		);
 		this._consignments = options?.consignments ?? DEFAULT_CONSIGNMENTS;
+
+		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
+			options?.urlTransformerComponentType ?? "url-transformer-service"
+		);
 	}
 
 	/**
@@ -186,6 +201,29 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 				processingGroupId: "test-default"
 			}
 		];
+	}
+
+	/**
+	 * Datasets handled by this DS App.
+	 * @param dataset the Dataset
+	 * @param tenantId the tenantId
+	 * @returns Datasets handled.
+	 */
+	public async datasetsHandled(
+		dataset: IDataspaceProtocolDataset,
+		tenantId: string
+	): Promise<IDataspaceProtocolDataset[]> {
+		// We modify here the original URL of the access service to include the encrypted tenant token
+		const distributions = ArrayHelper.fromObjectOrArray(dataset.distribution);
+
+		const service = distributions[0].accessService as IDataspaceProtocolDataService;
+		const originalEndpointURL = service.endpointURL;
+		service.endpointURL = await this._urlTransformer.addEncryptedQueryParamToUrl(
+			originalEndpointURL,
+			"tenant",
+			tenantId
+		);
+		return [dataset];
 	}
 
 	/**

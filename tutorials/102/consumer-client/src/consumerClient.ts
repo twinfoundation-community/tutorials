@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 
 import { randomUUID } from "node:crypto";
+import type { ITenantAdminComponent, IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
 import { ComponentFactory, Converter, Is, RandomHelper } from "@twin.org/core";
 import {
@@ -58,6 +59,10 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _transferProcessStorage: IEntityStorageConnector<TransferProcess>;
 
+	private readonly _urlTransformer: IUrlTransformerComponent;
+
+	private readonly _tenantAdmin: ITenantAdminComponent;
+
 	/**
 	 * Create a new instance.
 	 * @param options The constructor options.
@@ -93,6 +98,14 @@ export class ConsumerClient implements IConsumerClientComponent {
 		this._transferProcessStorage = EntityStorageConnectorFactory.get<
 			IEntityStorageConnector<TransferProcess>
 		>(options?.transferProcessEntityStorageType ?? nameofKebabCase<TransferProcess>());
+
+		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
+			options?.urlTransformerComponentType ?? "url-transformer-service"
+		);
+
+		this._tenantAdmin = ComponentFactory.get<ITenantAdminComponent>(
+			options?.tenantAdminComponentType ?? "tenant-admin-service"
+		);
 	}
 
 	public className(): string {
@@ -102,6 +115,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 	public async getData(): Promise<unknown> {
 		// eslint-disable-next-line no-async-promise-executor
 		return new Promise<unknown>(async (resolve, reject) => {
+			console.log("Hereeeeeeee")
 			try {
 				const ids = (await ContextIdStore.getContextIds()) as IContextIds;
 				console.log("IDs", ids);
@@ -302,4 +316,21 @@ export class ConsumerClient implements IConsumerClientComponent {
 	 * @param nodeLoggingComponentType Node Logging Component
 	 */
 	public async start(nodeLoggingComponentType?: string): Promise<void> {}
+
+	/**
+	 * Transform a catalogue distribution URL from `?x-api-key=...` shape to
+	 * `?x-enc-tenant-token=...` shape so post-#140 TenantProcessor will route it.
+	 * @param url The provider endpoint URL as discovered from the catalogue.
+	 * @returns The transformed URL with `x-enc-tenant-token` and no `x-api-key`.
+	 */
+	private async _toTenantTokenUrl(url: string): Promise<string> {
+		const u = new URL(url);
+		const apiKey = u.searchParams.get("x-api-key");
+		if (!Is.stringValue(apiKey)) {
+			return url;
+		}
+		const tenant = await this._tenantAdmin.getByApiKey(apiKey);
+		u.searchParams.delete("x-api-key");
+		return this._urlTransformer.addEncryptedQueryParamToUrl(u.toString(), "tenant", tenant.id);
+	}
 }

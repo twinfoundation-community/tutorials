@@ -57,7 +57,7 @@ export async function extensionInitialise(
 
 	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
 		{
-			type: DataspaceControlPlaneComponentType.Service,
+			type: DataspaceDataPlaneComponentType.Service,
 			options: {
 				config: {}
 			},
@@ -185,8 +185,6 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 				examples: []
 			}
 		]
-		// skipAuth: true,
-		// skipTenant: true
 	};
 
 	return [consumerClientRoute];

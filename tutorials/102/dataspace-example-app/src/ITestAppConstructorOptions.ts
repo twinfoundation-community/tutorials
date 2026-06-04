@@ -13,6 +13,12 @@ export interface ITestAppConstructorOptions {
 	loggingComponentType?: string;
 
 	/**
+	 * URL transformer component type.
+	 * @default url-transformer-service
+	 */
+	urlTransformerComponentType?: string;
+
+	/**
 	 * List of consignment documents to serve.
 	 * Can be loaded from a JSON file via the `@json:` env var syntax.
 	 * Falls back to built-in default consignments if not provided.

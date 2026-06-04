@@ -40,4 +40,16 @@ export interface IConsumerClientConstructorOptions {
 	 * Transfer Process Entity Storage Type
 	 */
 	transferProcessEntityStorageType?: string;
+
+	/**
+	 * URL transformer component type.
+	 * @default url-transformer-service
+	 */
+	urlTransformerComponentType?: string;
+
+	/**
+	 * Tenant admin component type.
+	 * @default tenant-admin-service
+	 */
+	tenantAdminComponentType?: string;
 }
