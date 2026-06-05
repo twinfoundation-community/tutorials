@@ -33,7 +33,7 @@ services:
     env_file: 
       - ../../common/.env.local
       - ./.env.extensions
-      - ./env.multitenant
+      - ./.env.multitenant
     volumes: 
       - twin_data:/var/lib/twin
       - ../../common/.env.local.bootstrap:/app/.env.local.bootstrap
