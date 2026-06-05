@@ -85,7 +85,10 @@ export function testAppInitialiser(
 			new TestDataspaceDataPlaneApp(
 				EngineTypeHelper.mergeConfig<ITestAppConstructorOptions>(
 					{
-						loggingComponentType: engineCore.getRegisteredInstanceType("loggingComponent")
+						loggingComponentType: engineCore.getRegisteredInstanceType("loggingComponent"),
+						auditableItemGraphComponentType: engineCore.getRegisteredInstanceType(
+							"auditableItemGraphComponent"
+						)
 					},
 					createConfig.options
 				)

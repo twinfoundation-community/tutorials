@@ -31,7 +31,8 @@
 		"@twin.org/nameof": "next",
 		"@twin.org/standards-dataspace-protocol": "next",
 		"@twin.org/standards-w3c-activity-streams": "next",
-		"@twin.org/standards-dublin-core": "next"
+		"@twin.org/standards-dublin-core": "next",
+		"@twin.org/auditable-item-graph-models": "next"
 	},
 	"devDependencies": {
 		"@twin.org/nameof-transformer": "next",

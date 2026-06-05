@@ -19,6 +19,11 @@ export interface ITestAppConstructorOptions {
 	urlTransformerComponentType?: string;
 
 	/**
+	 * Auditable Item Graph Component type.
+	 */
+	auditableItemGraphComponentType?: string;
+
+	/**
 	 * List of consignment documents to serve.
 	 * Can be loaded from a JSON file via the `@json:` env var syntax.
 	 * Falls back to built-in default consignments if not provided.

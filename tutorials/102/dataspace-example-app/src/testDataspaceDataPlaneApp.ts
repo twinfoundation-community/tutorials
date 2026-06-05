@@ -1,6 +1,12 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
 import type { IUrlTransformerComponent } from "@twin.org/api-models";
+import {
+	AuditableItemGraphContexts,
+	AuditableItemGraphTypes,
+	type IAuditableItemGraphComponent,
+	type IAuditableItemGraphVertex
+} from "@twin.org/auditable-item-graph-models";
 import { ContextIdHelper, ContextIdKeys, ContextIdStore } from "@twin.org/context";
 import { ArrayHelper, ComponentFactory, Guards } from "@twin.org/core";
 import { DataTypeHandlerFactory } from "@twin.org/data-core";
@@ -13,7 +19,7 @@ import {
 	type IDataspaceApp,
 	type IProcessingGroupOptions
 } from "@twin.org/dataspace-models";
-import type { ILoggingComponent } from "@twin.org/logging-models";
+import { LogLevel, type ILoggingComponent } from "@twin.org/logging-models";
 import { nameof } from "@twin.org/nameof";
 import type {
 	IDataspaceProtocolDataService,
@@ -106,6 +112,12 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	private readonly _urlTransformer: IUrlTransformerComponent;
 
 	/**
+	 * Auditable Item Graph Component
+	 * @internal
+	 */
+	private readonly _auditableItemGraph: IAuditableItemGraphComponent;
+
+	/**
 	 * Consignment documents served by this app.
 	 * @internal
 	 */
@@ -129,6 +141,10 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 
 		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
 			options?.urlTransformerComponentType ?? "url-transformer-service"
+		);
+
+		this._auditableItemGraph = ComponentFactory.get<IAuditableItemGraphComponent>(
+			options?.auditableItemGraphComponentType ?? "auditable-item-graph"
 		);
 	}
 
@@ -170,15 +186,6 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 		const contextIds = await ContextIdStore.getContextIds();
 		ContextIdHelper.guard(contextIds, ContextIdKeys.Node);
 		this._nodeId = contextIds[ContextIdKeys.Node];
-
-		DataTypeHandlerFactory.register("https://twin.example.org/MyCreate", () => ({
-			namespace: "https://twin.example.org/",
-			type: "MyCreate",
-			defaultValue: {},
-			jsonSchema: async () => ({
-				type: "object"
-			})
-		}));
 
 		DataTypeHandlerFactory.register("https://vocabulary.uncefact.org/Consignment", () => ({
 			namespace: "https://vocabulary.uncefact.org/",
@@ -239,19 +246,33 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 		);
 
 		await this._logging?.log({
-			level: "info",
+			level: LogLevel.Info,
 			source: TestDataspaceDataPlaneApp.CLASS_NAME,
 			message: `App Called: ${TestDataspaceDataPlaneApp.APP_ID}`
 		});
 
 		await this._logging?.log({
-			level: "info",
+			level: LogLevel.Info,
 			source: TestDataspaceDataPlaneApp.CLASS_NAME,
 			message: `Node Identity: ${this._nodeId ?? ""}`
 		});
 
-		await new Promise(resolve => setTimeout(resolve, 500));
-		return "1234" as T;
+		Guards.object(TestDataspaceDataPlaneApp.CLASS_NAME, nameof(activity.object), activity.object);
+
+		const vertex: Omit<IAuditableItemGraphVertex, "id"> = {
+			"@context": [AuditableItemGraphContexts.Context, AuditableItemGraphContexts.ContextCommon],
+			type: AuditableItemGraphTypes.Vertex,
+			annotationObject: ArrayHelper.fromObjectOrArray(activity.object)[0]
+		};
+		const vertexId = await this._auditableItemGraph.create(vertex);
+
+		await this._logging?.log({
+			level: LogLevel.Info,
+			source: TestDataspaceDataPlaneApp.CLASS_NAME,
+			message: `Vertex created: ${vertexId}`
+		});
+
+		return vertexId as T;
 	}
 
 	/**
