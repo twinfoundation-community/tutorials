@@ -4,6 +4,7 @@ It includes:
 
 * [Env files](./).
 * [How to bootstrap a Node](./HOWTO-bootstrap-node.md) step by step.
+* [Database initialization files](./init/)
 
 ## Environments
 

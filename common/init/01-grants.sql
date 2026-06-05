@@ -1,0 +1,2 @@
+GRANT ALL PRIVILEGES ON twin.* TO 'twin'@'%'; 
+FLUSH PRIVILEGES;

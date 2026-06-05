@@ -10,18 +10,29 @@ services:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_USER: twin
       MYSQL_PASSWORD: twin
+      MYSQL_DATABASE: twin
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u twin -ptwin --silent || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     ports:
       - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data_101:/var/lib/mysql
+      - ../../common/init:/docker-entrypoint-initdb.d
 
   twin-node-bootstrap:
+    container_name: twin_node_bootstrap
     image: twinfoundation/twin-node:0.0.3-next.46
     depends_on:
-      - db
-    env_file: ../../common/.env
+       db:
+        condition: service_healthy
+    # env_file: ../../common/.env Uncomment this to use IOTA
+    env_file: ../../common/.env.local
     volumes: 
-      - twin_data:/var/lib/twin
+      - twin_data_101:/var/lib/twin
       - ../../common/.env.bootstrap-legacy:/app/.env.bootstrap-legacy
     command: |
       sh -c 'node src/index.js bootstrap-legacy --load-env=.env.bootstrap-legacy'
@@ -31,14 +42,16 @@ services:
     image: twinfoundation/twin-node:0.0.3-next.46
     container_name: twin_node_
     depends_on:
-      - db
+       db:
+        condition: service_healthy
     ports:
       - "3000:3000"
-    env_file: ../../common/.env
+    # env_file: ../../common/.env Uncomment this to use IOTA
+    env_file: ../../common/.env.local
     volumes: 
-      - twin_data:/var/lib/twin
+      - twin_data_101:/var/lib/twin
 
 
 volumes:
-  mysql_data:
-  twin_data:
+  mysql_data_101:
+  twin_data_101:
