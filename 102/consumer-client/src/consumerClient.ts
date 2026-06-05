@@ -5,33 +5,23 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import { randomUUID } from "node:crypto";
 import type { ITenantAdminComponent, IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
-import { ComponentFactory, Converter, Is, RandomHelper } from "@twin.org/core";
+import { ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
-	type IDataspaceControlPlaneComponent,
-	type IDataspaceDataPlaneComponent,
-	type TransferProcess
+	type IDataspaceControlPlaneComponent
 } from "@twin.org/dataspace-models";
-import {
-	EntityStorageConnectorFactory,
-	type IEntityStorageConnector
-} from "@twin.org/entity-storage-models";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
-import { nameofKebabCase } from "@twin.org/nameof";
 import {
 	DataspaceProtocolCatalogTypes,
-	DataspaceProtocolContexts,
 	type DataspaceProtocolContractNegotiationStateType,
-	DataspaceProtocolTransferProcessTypes,
 	type IDataspaceProtocolAgreement,
 	type IDataspaceProtocolDataService,
 	type IDataspaceProtocolOffer
 } from "@twin.org/standards-dataspace-protocol";
-import type { ITrustComponent } from "@twin.org/trust-models";
+import { TrustHelper, type ITrustComponent } from "@twin.org/trust-models";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 
@@ -50,16 +40,9 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _dataspaceControlPlane: IDataspaceControlPlaneComponent;
 
-	private readonly _providerControlPlane: IDataspaceControlPlaneComponent;
-
-	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
-	private readonly _providerDataPlane: IDataspaceDataPlaneComponent;
-
 	private readonly _trustComponent: ITrustComponent;
 
 	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
-
-	private readonly _transferProcessStorage: IEntityStorageConnector<TransferProcess>;
 
 	// PLATFORM-CATCHUP: two new in-process dependencies for the URL transformation
 	// dance below. See `_toTenantTokenUrl`.
@@ -72,8 +55,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 	 * @param options The constructor options.
 	 */
 	constructor(options?: IConsumerClientConstructorOptions) {
-		console.log(ComponentFactory.names());
-
 		this._dataspaceControlPlane = ComponentFactory.get<IDataspaceControlPlaneComponent>(
 			options?.dataspaceControlPlaneComponentType ?? "dataspaceControlPlane"
 		);
@@ -82,26 +63,13 @@ export class ConsumerClient implements IConsumerClientComponent {
 			options?.loggingComponentType ?? "dataspaceControlPlane"
 		);
 
-		this._providerDataPlane = ComponentFactory.get<IDataspaceDataPlaneComponent>(
-			options?.dataspaceControlPlaneOfDataProviderComponentType ?? "dataspaceDataPlane"
-		);
-
 		this._trustComponent = ComponentFactory.get<ITrustComponent>(
 			options?.trustComponentType ?? "trust"
-		);
-
-		this._providerControlPlane = ComponentFactory.get<IDataspaceControlPlaneComponent>(
-			options?.dataspaceControlPlaneOfDataProviderComponentType ??
-				"dataspaceControlPlaneOfDataProvider"
 		);
 
 		this._federatedCatalogue = ComponentFactory.get<IFederatedCatalogueComponent>(
 			options?.federatedCatalogueComponentType ?? "federatedCatalogue"
 		);
-
-		this._transferProcessStorage = EntityStorageConnectorFactory.get<
-			IEntityStorageConnector<TransferProcess>
-		>(options?.transferProcessEntityStorageType ?? nameofKebabCase<TransferProcess>());
 
 		// PLATFORM-CATCHUP: factory keys are `url-transformer-service` and
 		// `tenant-admin-service` (verified at runtime via ComponentFactory.names());
@@ -115,31 +83,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 		);
 	}
 
-	// PLATFORM-CATCHUP: NEW helper. Catalogue distribution URLs in this tutorial
-	// are registered with a static `?x-api-key=...` (older platform shape). Post
-	// api-service #140 the TenantProcessor only accepts api-key for `/login`, so
-	// cross-tenant calls to PNP / data-plane routes need an encrypted tenant
-	// token (`x-enc-tenant-token`). Convert the discovered URL by looking up the
-	// tenant by its api-key, dropping the api-key param, and baking an encrypted
-	// token in its place — same shape a production catalogue would have served
-	// originally.
-	/**
-	 * Transform a catalogue distribution URL from `?x-api-key=...` shape to
-	 * `?x-enc-tenant-token=...` shape so post-#140 TenantProcessor will route it.
-	 * @param url The provider endpoint URL as discovered from the catalogue.
-	 * @returns The transformed URL with `x-enc-tenant-token` and no `x-api-key`.
-	 */
-	private async _toTenantTokenUrl(url: string): Promise<string> {
-		const u = new URL(url);
-		const apiKey = u.searchParams.get("x-api-key");
-		if (!Is.stringValue(apiKey)) {
-			return url;
-		}
-		const tenant = await this._tenantAdmin.getByApiKey(apiKey);
-		u.searchParams.delete("x-api-key");
-		return this._urlTransformer.addEncryptedQueryParamToUrl(u.toString(), "tenant", tenant.id);
-	}
-
 	public className(): string {
 		return "ConsumerClient";
 	}
@@ -149,7 +92,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 		return new Promise<unknown>(async (resolve, reject) => {
 			try {
 				const ids = (await ContextIdStore.getContextIds()) as IContextIds;
-				console.log("IDs", ids);
 
 				// Query the federated Catalogue
 				const datasets = await this._federatedCatalogue.query([
@@ -169,13 +111,14 @@ export class ConsumerClient implements IConsumerClientComponent {
 				// datasets under `catalog[0].dataset[]`; the top-level `dataset[]`
 				// can be empty. Read both shapes, prefer top-level if present.
 				const nestedDatasets = (
-					catalog as unknown as { catalog?: Array<{ dataset?: typeof catalog.dataset }> }
+					catalog as unknown as { catalog?: { dataset?: typeof catalog.dataset }[] }
 				).catalog?.[0]?.dataset;
-				const datasetList = Is.arrayValue(catalog.dataset)
-					? catalog.dataset
-					: Is.arrayValue(nestedDatasets)
-						? nestedDatasets
-						: undefined;
+				let datasetList: typeof catalog.dataset | undefined;
+				if (Is.arrayValue(catalog.dataset)) {
+					datasetList = catalog.dataset;
+				} else if (Is.arrayValue(nestedDatasets)) {
+					datasetList = nestedDatasets;
+				}
 				if (!Is.arrayValue(datasetList)) {
 					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
 					return;
@@ -192,14 +135,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 				// PLATFORM-CATCHUP: discovered URL still uses `?x-api-key=...`. Convert
 				// to `?x-enc-tenant-token=...` so post-#140 TenantProcessor accepts it
 				// at every cross-tenant hop (PNP request/event/verification etc.).
+				// This is the NEGOTIATION endpoint (rights-management path).
 				const providerEndpoint = await this._toTenantTokenUrl(rawProviderEndpoint);
-				// PLATFORM-CATCHUP: build the consumer-side callback URL the same
-				// way. The previous hardcoded `?x-api-key=...` callback URL was
-				// rejected by the provider's TenantProcessor when it pushed back.
-				const consumerCallbackAddress = await this._urlTransformer.addEncryptedQueryParamToUrl(
-					`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
-					"tenant",
-					ids[ContextIdKeys.Tenant] as string
+
+				// The TRANSFER endpoint is the provider's dataspace-control-plane on the same
+				// host. startDataTransfer passes pathPrefix:"" to the REST client, so the
+				// endpoint must already carry the correct base path. Derive it from the
+				// catalogue host (the distribution URL points at the rights-management
+				// negotiation path) and bake the same encrypted tenant token.
+				const transferEndpointUrl = new URL(rawProviderEndpoint);
+				transferEndpointUrl.pathname = "/dataspace-control-plane";
+				const providerControlPlaneEndpoint = await this._toTenantTokenUrl(
+					transferEndpointUrl.toString()
 				);
 
 				await this._logging.log({
@@ -208,23 +155,20 @@ export class ConsumerClient implements IConsumerClientComponent {
 					source: this.className()
 				});
 
-				// Workaround until we get the organization identity
-				const consumerIdentity =
-					"did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431";
-
-				const providerIdentity =
-					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
-
-				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
+				// PLATFORM-CATCHUP: the trust token must carry the consumer's tenant hash as
+				// the `tid` claim. The provider captures this during negotiation and stamps
+				// the agreement assignee as the consumer composite `nodeDid:hash(tenantId)`;
+				// the transfer side rebuilds the caller composite from the same `tid`. Passing
+				// `undefined` yields a bare-DID assignee that can't match a tenant-scoped
+				// caller (`callerNotAuthorizedForAgreement`). Hash the tenant id the same way
+				// the platform does (TrustHelper.hashTenantId).
 				const token = await this._trustComponent.generate(
 					ids[ContextIdKeys.Node] as string,
 					undefined,
 					{},
-					undefined,
-					ids[ContextIdKeys.Node]
+					TrustHelper.hashTenantId(ids[ContextIdKeys.Tenant]),
+					ids[ContextIdKeys.Organization]
 				);
-
-				console.log("tttttt", token);
 
 				const negotiationCallbackId = `negotiation-${new Date().toISOString()}`;
 
@@ -262,83 +206,34 @@ export class ConsumerClient implements IConsumerClientComponent {
 						});
 
 						try {
-							const consumerPid = `urn:uuid:${randomUUID()}`;
 							// PLATFORM-CATCHUP: `DataspaceTransferFormat.HttpProxyPull`
 							// was renamed to `HttpDataPull` in dataspace-models
 							// (commit 2c9d424).
 							const format = DataspaceTransferFormat.HttpDataPull;
 
-							// PLATFORM-CATCHUP: rather than HTTP-loopback via
-							// `_providerControlPlane` (the remote REST client whose URL was
-							// bound to `?x-api-key=...` at engine init and still slams
-							// into the new x-enc-tenant-token gate), call the local
-							// `_dataspaceControlPlane.requestTransfer` under the PROVIDER
-							// tenant's context. The transfer-process row lands in the
-							// provider's partition just as it would after a real
-							// cross-tenant HTTP hop. The api-key in the raw
-							// providerEndpoint URL is what we use to look up which tenant.
-							const providerApiKey = new URL(rawProviderEndpoint).searchParams.get("x-api-key");
-							if (!Is.stringValue(providerApiKey)) {
-								throw new Error(
-									"Catalogue distribution URL has no x-api-key to identify the provider tenant"
-								);
-							}
-							const providerTenant = await this._tenantAdmin.getByApiKey(providerApiKey);
-
-							const transferRequestResult = await ContextIdStore.run(
-								{ ...ids, [ContextIdKeys.Tenant]: providerTenant.id },
-								async () =>
-									this._dataspaceControlPlane.requestTransfer(
-										{
-											"@context": [DataspaceProtocolContexts.Context],
-											"@type": DataspaceProtocolTransferProcessTypes.TransferRequestMessage,
-											agreementId,
-											consumerPid,
-											callbackAddress: consumerCallbackAddress,
-											format
-										},
-										token
-									)
+							// Use the dataspace control plane convenience method to start the
+							// transfer. It resolves the agreement from the consumer PAP (requires
+							// the bug #175 fix that writes the agreement to the consumer PAP on
+							// finalize), builds the TransferRequestMessage, dispatches it to the
+							// provider at `providerEndpoint` (which carries ?x-enc-tenant-token=...),
+							// and persists the consumer-side transfer-process. The endpoint token is
+							// only honored because the dataspace control plane REST client is
+							// registered isMultiInstance (bug #190 fix).
+							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
+								agreementId,
+								providerControlPlaneEndpoint,
+								this._CONSUMER_ENDPOINT,
+								format,
+								token
 							);
-
-							if (
-								transferRequestResult["@type"] ===
-								DataspaceProtocolTransferProcessTypes.TransferError
-							) {
-								await this._logging.log({
-									level: LogLevel.Error,
-									message: `Transfer Process Error: reason: ${JSON.stringify(transferRequestResult.reason)}`,
-									source: this.className()
-								});
-								reject(transferRequestResult.reason);
-								return;
-							}
 
 							await this._logging.log({
 								level: LogLevel.Debug,
-								message: `Transfer Process created. State: ${transferRequestResult.state}, 
-                                        Provider Pid: ${transferRequestResult.providerPid}, Consumer Pid: ${transferRequestResult.consumerPid}`,
+								message: `Transfer started. Consumer Pid: ${transferResult.consumerPid}`,
 								source: this.className()
 							});
 
-							const transferProcess: TransferProcess = {
-								consumerPid,
-								providerPid: transferRequestResult.providerPid,
-								state: transferRequestResult.state,
-								agreementId,
-								dateCreated: new Date().toISOString(),
-								dateModified: new Date().toISOString(),
-								datasetId,
-								offerId: datasetPolicyId,
-								id: Converter.bytesToHex(RandomHelper.generate(32)),
-								providerIdentity,
-								format
-							};
-							await this._transferProcessStorage.set(transferProcess);
-
-							// Call the provider endpoint
-
-							resolve({});
+							resolve(transferResult);
 						} catch (error) {
 							await this._logging.log({
 								level: LogLevel.Error,
@@ -399,4 +294,29 @@ export class ConsumerClient implements IConsumerClientComponent {
 	 * @param nodeLoggingComponentType Node Logging Component
 	 */
 	public async start(nodeLoggingComponentType?: string): Promise<void> {}
+
+	// PLATFORM-CATCHUP: NEW helper. Catalogue distribution URLs in this tutorial
+	// are registered with a static `?x-api-key=...` (older platform shape). Post
+	// api-service #140 the TenantProcessor only accepts api-key for `/login`, so
+	// cross-tenant calls to PNP / data-plane routes need an encrypted tenant
+	// token (`x-enc-tenant-token`). Convert the discovered URL by looking up the
+	// tenant by its api-key, dropping the api-key param, and baking an encrypted
+	// token in its place — same shape a production catalogue would have served
+	// originally.
+	/**
+	 * Transform a catalogue distribution URL from `?x-api-key=...` shape to
+	 * `?x-enc-tenant-token=...` shape so post-#140 TenantProcessor will route it.
+	 * @param url The provider endpoint URL as discovered from the catalogue.
+	 * @returns The transformed URL with `x-enc-tenant-token` and no `x-api-key`.
+	 */
+	private async _toTenantTokenUrl(url: string): Promise<string> {
+		const u = new URL(url);
+		const apiKey = u.searchParams.get("x-api-key");
+		if (!Is.stringValue(apiKey)) {
+			return url;
+		}
+		const tenant = await this._tenantAdmin.getByApiKey(apiKey);
+		u.searchParams.delete("x-api-key");
+		return this._urlTransformer.addEncryptedQueryParamToUrl(u.toString(), "tenant", tenant.id);
+	}
 }

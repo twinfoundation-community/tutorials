@@ -6,7 +6,7 @@ import type {
 	ITenantAdminComponent,
 	IUrlTransformerComponent
 } from "@twin.org/api-models";
-import { ComponentFactory } from "@twin.org/core";
+import { ComponentFactory, GeneralError, Is } from "@twin.org/core";
 import type {
 	EngineTypeInitialiserReturn,
 	IEngineCore,
@@ -54,10 +54,15 @@ export async function extensionInitialise(
 			restPath: "dataspace-control-plane"
 		},
 		{
+			// PLATFORM-CATCHUP (bug #190): must be isMultiInstance so startDataTransfer's
+			// per-call endpoint (carrying ?x-enc-tenant-token=...) is honored. Without it the
+			// factory returns a static singleton and drops the token → missingTenantToken.
+			// The endpoint here is a placeholder; the real endpoint is supplied per-call.
 			type: DataspaceControlPlaneComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000?x-api-key=019e84e483d07390a3a37052d35f88ef"
+				endpoint: "http://host.docker.internal:3000"
 			},
+			isMultiInstance: true,
 			features: ["remote"]
 		}
 	];
@@ -221,15 +226,14 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 		method: "GET",
 		tag: "client",
 		path: `${baseRouteName}/mint-tenant-token`,
-		handler: async (_httpRequestContext, request) => {
+		handler: async (httpRequestContext, request) => {
 			const apiKey = request?.query?.apiKey;
-			if (typeof apiKey !== "string" || apiKey.length === 0) {
-				throw new Error("apiKey query param is required");
+			if (!Is.stringValue(apiKey)) {
+				throw new GeneralError("consumerClient", "apiKeyQueryParamRequired");
 			}
 			const tenantAdmin = ComponentFactory.get<ITenantAdminComponent>("tenant-admin-service");
-			const urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
-				"url-transformer-service"
-			);
+			const urlTransformer =
+				ComponentFactory.get<IUrlTransformerComponent>("url-transformer-service");
 			const tenant = await tenantAdmin.getByApiKey(apiKey);
 			const stamped = await urlTransformer.addEncryptedQueryParamToUrl(
 				"http://placeholder/",
