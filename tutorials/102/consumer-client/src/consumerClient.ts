@@ -17,6 +17,7 @@ import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
 import {
 	DataspaceProtocolCatalogTypes,
+	IDataspaceProtocolCatalogError,
 	type DataspaceProtocolContractNegotiationStateType,
 	type DataspaceProtocolTransferProcessStateType,
 	type IDataspaceProtocolAgreement,
@@ -24,7 +25,7 @@ import {
 	type IDataspaceProtocolOffer,
 	type IDataspaceProtocolTransferStartMessage
 } from "@twin.org/standards-dataspace-protocol";
-import type { ITrustComponent } from "@twin.org/trust-models";
+import { TrustHelper, type ITrustComponent } from "@twin.org/trust-models";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 
@@ -91,8 +92,10 @@ export class ConsumerClient implements IConsumerClientComponent {
 				const ids = (await ContextIdStore.getContextIds()) as IContextIds;
 				console.log("IDs", ids);
 
+				console.log("Before Catalog");
+
 				// Query the federated Catalogue
-				const datasets = await this._federatedCatalogue.query([
+				const catalogResponse = await this._federatedCatalogue.query([
 					/*
 					{
 						"@type": "FilterByExample",
@@ -100,6 +103,13 @@ export class ConsumerClient implements IConsumerClientComponent {
 					}
 					*/
 				]);
+
+				if (catalogResponse.result["@type"] === DataspaceProtocolCatalogTypes.CatalogError) {
+					const catalogError = catalogResponse.result;
+					reject(new Error(catalogError.code));
+					return;
+				}
+				console.log(datasets);
 
 				const result = datasets.result;
 				if (result["@type"] === DataspaceProtocolCatalogTypes.CatalogError) {
@@ -136,14 +146,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 				const providerIdentity =
 					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
 
+				console.log("After Catalog");
+
 				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
 				const token = await this._trustComponent.generate(
-					consumerIdentity,
+					ids[ContextIdKeys.Node] as string,
 					undefined,
 					{},
-					ids[ContextIdKeys.Tenant],
+					TrustHelper.hashTenantId(ids[ContextIdKeys.Tenant]),
 					consumerIdentity
 				);
+
+				console.log("Token", token);
 
 				const negotiationCallbackId = `negotiation-${new Date().toISOString()}`;
 
