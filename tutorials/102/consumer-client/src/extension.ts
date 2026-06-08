@@ -13,7 +13,8 @@ import {
 	type IEngineConfig,
 	DataspaceControlPlaneComponentType,
 	DataspaceDataPlaneComponentType,
-	EngineTypeHelper
+	EngineTypeHelper,
+	FederatedCatalogueComponentType
 } from "@twin.org/engine-types";
 import { ConsumerClient } from "./consumerClient.js";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
@@ -38,23 +39,6 @@ export async function extensionInitialise(
 		}
 	];
 
-	nodeEngineConfig.types.dataspaceControlPlaneComponent = [
-		{
-			type: DataspaceControlPlaneComponentType.Service,
-			options: {
-				config: {}
-			},
-			restPath: "dataspace-control-plane"
-		},
-		{
-			type: DataspaceControlPlaneComponentType.RestClient,
-			options: {
-				endpoint: "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9"
-			},
-			features: ["remote"]
-		}
-	];
-
 	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
 		{
 			type: DataspaceDataPlaneComponentType.Service,
@@ -66,7 +50,37 @@ export async function extensionInitialise(
 		{
 			type: DataspaceDataPlaneComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000?x-api-key=019e5ee3ad5f7e94a197735372d895a9"
+				endpoint: "http://host.docker.internal:3000"
+			},
+			features: ["remote"]
+		}
+	];
+
+	nodeEngineConfig.types.dataspaceControlPlaneComponent = [
+		{
+			type: DataspaceControlPlaneComponentType.RestClient,
+			options: {
+				endpoint: "http://host.docker.internal:3000"
+			},
+			features: ["remote"]
+		},
+		{
+			type: DataspaceControlPlaneComponentType.Service,
+			options: {
+				config: {}
+			}
+		}
+	];
+
+	nodeEngineConfig.types.federatedCatalogueComponent = [
+		{
+			type: FederatedCatalogueComponentType.Service,
+			restPath: "federated-catalogue"
+		},
+		{
+			type: FederatedCatalogueComponentType.RestClient,
+			options: {
+				endpoint: "http://host.docker.internal:3000"
 			},
 			features: ["remote"]
 		}
@@ -135,11 +149,7 @@ export function consumerClientInitialiser(
 						trustComponentType: engineCore.getRegisteredInstanceType("trustComponent"),
 
 						federatedCatalogueComponentType: engineCore.getRegisteredInstanceType(
-							"federatedCatalogueComponent"
-						),
-
-						dataspaceControlPlaneOfDataProviderComponentType: engineCore.getRegisteredInstanceType(
-							"dataspaceControlPlaneComponent",
+							"federatedCatalogueComponent",
 							["remote"]
 						),
 						dataspaceDataPlaneOfDataProviderComponentType: engineCore.getRegisteredInstanceType(

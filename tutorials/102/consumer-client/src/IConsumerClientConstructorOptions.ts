@@ -27,11 +27,6 @@ export interface IConsumerClientConstructorOptions {
 	trustComponentType?: string;
 
 	/**
-	 * Dataspace Control Plane of provider component type.
-	 */
-	dataspaceControlPlaneOfDataProviderComponentType?: string;
-
-	/**
 	 * Federated Catalogue Component Type
 	 */
 	federatedCatalogueComponentType?: string;

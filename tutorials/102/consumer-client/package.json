@@ -24,7 +24,7 @@
 		"@twin.org/core": "next",
 		"@twin.org/data-core": "next",
 		"@twin.org/data-json-ld": "next",
-		"@twin.org/dataspace-models": "^0.0.3-next.38",
+		"@twin.org/dataspace-models": "next",
 		"@twin.org/engine-models": "next",
 		"@twin.org/engine-types": "next",
 		"@twin.org/logging-models": "next",
@@ -32,7 +32,8 @@
 		"@twin.org/standards-dataspace-protocol": "next",
 		"@twin.org/trust-models": "next",
 		"@twin.org/federated-catalogue-models": "next",
-		"@twin.org/entity-storage-models": "next"
+		"@twin.org/entity-storage-models": "next",
+		"@twin.org/federated-catalogue-rest-client": "next"
 	},
 	"devDependencies": {
 		"@twin.org/nameof-transformer": "next",

@@ -7,17 +7,20 @@
 
 import type { IUrlTransformerComponent } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
-import { ComponentFactory, Is } from "@twin.org/core";
+import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
 	type IDataspaceControlPlaneComponent,
 	type IDataspaceDataPlaneComponent
 } from "@twin.org/dataspace-models";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
+import type { FederatedCatalogueRestClient } from "@twin.org/federated-catalogue-rest-client";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
 import {
 	DataspaceProtocolCatalogTypes,
-	IDataspaceProtocolCatalogError,
+	type IDataspaceProtocolCatalogBase,
+	type IDataspaceProtocolDataset,
+	type IDataspaceProtocolDatasetBase,
 	type DataspaceProtocolContractNegotiationStateType,
 	type DataspaceProtocolTransferProcessStateType,
 	type IDataspaceProtocolAgreement,
@@ -65,7 +68,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 		);
 
 		this._providerDataPlane = ComponentFactory.get<IDataspaceDataPlaneComponent>(
-			options?.dataspaceControlPlaneOfDataProviderComponentType ?? "dataspaceDataPlane"
+			options?.dataspaceDataPlaneOfDataProviderComponentType ?? "dataspaceDataPlane"
 		);
 
 		this._trustComponent = ComponentFactory.get<ITrustComponent>(
@@ -94,39 +97,70 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 				console.log("Before Catalog");
 
+				// Workaround until we get the organization identity
+				const consumerIdentity = ids[ContextIdKeys.Organization] as string;
+
+				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
+				const token = await this._trustComponent.generate(
+					ids[ContextIdKeys.Node] as string,
+					undefined,
+					{},
+					TrustHelper.hashTenantId(ids[ContextIdKeys.Tenant]),
+					consumerIdentity
+				);
+
 				// Query the federated Catalogue
-				const catalogResponse = await this._federatedCatalogue.query([
-					/*
+				const catalogResponse = await (
+					this._federatedCatalogue as FederatedCatalogueRestClient
+				).query(
+					[
+						/*
 					{
 						"@type": "FilterByExample",
 						"dcterms:type": this._DATASET_TYPE
 					}
 					*/
-				]);
+					],
+					undefined,
+					undefined,
+					token
+				);
 
 				if (catalogResponse.result["@type"] === DataspaceProtocolCatalogTypes.CatalogError) {
 					const catalogError = catalogResponse.result;
 					reject(new Error(catalogError.code));
 					return;
 				}
-				console.log(datasets);
+				console.log(catalogResponse);
 
-				const result = datasets.result;
-				if (result["@type"] === DataspaceProtocolCatalogTypes.CatalogError) {
-					reject(result);
-					return;
-				}
-				const catalog = result;
-				if (!Is.arrayValue(catalog.catalog)) {
+				const catalog = catalogResponse.result;
+				if (!Is.arrayValue(catalog.catalog) && !Is.arrayValue(catalog.dataset)) {
 					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
 					return;
 				}
-				if (!Is.arrayValue(catalog.catalog[0].dataset)) {
+				let dataset: IDataspaceProtocolDataset | undefined;
+
+				if (Is.arrayValue(catalog.dataset)) {
+					dataset = ArrayHelper.fromObjectOrArray<IDataspaceProtocolDatasetBase>(
+						catalog.dataset
+					)[0] as IDataspaceProtocolDataset;
+				}
+				if (Is.arrayValue(catalog.catalog)) {
+					const catalogItem = ArrayHelper.fromObjectOrArray<IDataspaceProtocolCatalogBase>(
+						catalog.catalog
+					)[0];
+					if (!Is.arrayValue(catalogItem.dataset)) {
+						reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
+						return;
+					}
+					dataset = catalogItem.dataset[0] as IDataspaceProtocolDataset;
+				}
+
+				if (Is.undefined(dataset)) {
 					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
 					return;
 				}
 
-				const dataset = catalog.catalog[0].dataset[0];
 				const datasetId = dataset["@id"];
 				const datasetPolicyId = dataset.hasPolicy[0]["@id"];
 
@@ -140,22 +174,10 @@ export class ConsumerClient implements IConsumerClientComponent {
 					source: this.className()
 				});
 
-				// Workaround until we get the organization identity
-				const consumerIdentity = ids[ContextIdKeys.Organization] as string;
-
 				const providerIdentity =
 					"did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f";
 
 				console.log("After Catalog");
-
-				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
-				const token = await this._trustComponent.generate(
-					ids[ContextIdKeys.Node] as string,
-					undefined,
-					{},
-					TrustHelper.hashTenantId(ids[ContextIdKeys.Tenant]),
-					consumerIdentity
-				);
 
 				console.log("Token", token);
 
