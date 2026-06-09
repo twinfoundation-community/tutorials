@@ -10,8 +10,7 @@ import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/conte
 import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
-	type IDataspaceControlPlaneComponent,
-	type IDataspaceDataPlaneComponent
+	type IDataspaceControlPlaneComponent
 } from "@twin.org/dataspace-models";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import type { FederatedCatalogueRestClient } from "@twin.org/federated-catalogue-rest-client";
@@ -45,9 +44,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 	private readonly _dataspaceControlPlane: IDataspaceControlPlaneComponent;
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
-	private readonly _providerDataPlane: IDataspaceDataPlaneComponent;
-
 	private readonly _trustComponent: ITrustComponent;
 
 	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
@@ -63,13 +59,13 @@ export class ConsumerClient implements IConsumerClientComponent {
 			options?.dataspaceControlPlaneComponentType ?? "dataspaceControlPlane"
 		);
 
+		// Use the logging component, not dataspaceControlPlane (which is not a logger).
 		this._logging = ComponentFactory.get<ILoggingComponent>(
-			options?.loggingComponentType ?? "dataspaceControlPlane"
+			options?.loggingComponentType ?? "logging"
 		);
 
-		this._providerDataPlane = ComponentFactory.get<IDataspaceDataPlaneComponent>(
-			options?.dataspaceDataPlaneOfDataProviderComponentType ?? "dataspaceDataPlane"
-		);
+		// No remote data-plane ComponentFactory.get() here. The field was unused and the
+		// initialiser wired a multi-instance control-plane client, which crashes at startup.
 
 		this._trustComponent = ComponentFactory.get<ITrustComponent>(
 			options?.trustComponentType ?? "trust"
@@ -162,11 +158,29 @@ export class ConsumerClient implements IConsumerClientComponent {
 				}
 
 				const datasetId = dataset["@id"];
-				const datasetPolicyId = dataset.hasPolicy[0]["@id"];
 
-				const providerEndpoint = (
-					dataset.distribution[0].accessService as IDataspaceProtocolDataService
-				).endpointURL;
+				// Federated-catalogue query responses use compacted DCAT/ODRL keys (dcat:distribution,
+				// odrl:hasPolicy) and may expose accessService as a tokenized URL string — not the
+				// short keys (distribution, hasPolicy) or nested DataService.endpointURL shape.
+				const datasetRecord = dataset as IDataspaceProtocolDataset & Record<string, unknown>;
+				const policies = ArrayHelper.fromObjectOrArray(
+					datasetRecord.hasPolicy ?? datasetRecord["odrl:hasPolicy"]
+				);
+				const datasetPolicyId = (policies[0] as { "@id": string })["@id"];
+
+				const distributions = ArrayHelper.fromObjectOrArray(
+					datasetRecord.distribution ?? datasetRecord["dcat:distribution"]
+				);
+				const distribution = distributions[0] as unknown as Record<string, unknown>;
+				const rawAccessService = distribution.accessService ?? distribution["dcat:accessService"];
+				let providerEndpoint: string;
+				if (typeof rawAccessService === "string") {
+					providerEndpoint = rawAccessService;
+				} else {
+					const service = rawAccessService as IDataspaceProtocolDataService &
+						Record<string, string>;
+					providerEndpoint = service.endpointURL ?? service["dcat:endpointURL"];
+				}
 
 				await this._logging.log({
 					level: LogLevel.Debug,
@@ -245,8 +259,9 @@ export class ConsumerClient implements IConsumerClientComponent {
 								onTerminated: async (consumerPid: string, reason?: string) => {}
 							});
 
-							const providerEndpointTransfer = new URL(providerEndpoint);
-							providerEndpointTransfer.pathname += "dataspace-control-plane";
+							// Catalogue accessService already points at .../dataspace-control-plane?x-enc-tenant-token=...
+							// Appending "dataspace-control-plane" again breaks the URL and drops the tenant token
+							// on the outbound transfer POST (see extension isMultiInstance on control-plane client).
 							const consumerTransferCallback =
 								await this._urlTransformer.addEncryptedQueryParamToUrl(
 									`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
@@ -255,7 +270,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 								);
 							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
 								agreementId,
-								providerEndpointTransfer.toString(),
+								providerEndpoint,
 								consumerTransferCallback,
 								format,
 								token
@@ -291,21 +306,20 @@ export class ConsumerClient implements IConsumerClientComponent {
 					}
 				});
 
-				const consumerCallbackAddress = await this._urlTransformer.addEncryptedQueryParamToUrl(
-					`${this._CONSUMER_ENDPOINT}/rights-management`,
-					"tenant",
-					ids[ContextIdKeys.Tenant] as string
-				);
+				// PNP buildCallbackUrl() appends its configured callbackPath (rights-management)
+				// and encrypts the consumer tenant token; pass host origin only.
+				const consumerCallbackOrigin = this._CONSUMER_ENDPOINT;
 
+				// Provider PNP lives at /rights-management; replace pathname (keep x-enc-tenant-token query).
 				const negotiationProviderEndpoint = new URL(providerEndpoint);
-				negotiationProviderEndpoint.pathname += "rights-management";
+				negotiationProviderEndpoint.pathname = "/rights-management";
 
 				// Everything starts with a Contract Negotiation
 				const negotiationId = await this._dataspaceControlPlane.negotiateAgreement(
 					datasetId,
 					datasetPolicyId,
 					negotiationProviderEndpoint.toString(),
-					consumerCallbackAddress,
+					consumerCallbackOrigin,
 					token
 				);
 

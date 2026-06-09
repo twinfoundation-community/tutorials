@@ -54,6 +54,9 @@ export async function extensionInitialise(
 		}
 	];
 
+	// Control-plane RestClient must be multi-instance so startDataTransfer() can
+	// ComponentFactory.create() with the catalogue providerEndpoint (incl. x-enc-tenant-token).
+	// Without this, the singleton client POSTs to the bare host URL → missingTenantToken on transfer.
 	nodeEngineConfig.types.dataspaceControlPlaneComponent = [
 		{
 			type: DataspaceControlPlaneComponentType.Service,
@@ -73,6 +76,8 @@ export async function extensionInitialise(
 		}
 	];
 
+	// Data-plane RestClient stays singleton (matches twin-node defaults). Do not set
+	// isMultiInstance here — multi-instance types cannot be resolved via ComponentFactory.get().
 	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
 		{
 			type: DataspaceDataPlaneComponentType.Service,
@@ -87,8 +92,7 @@ export async function extensionInitialise(
 			options: {
 				endpoint: "http://host.docker.internal:3000"
 			},
-			features: ["remote"],
-			isMultiInstance: true
+			features: ["remote"]
 		}
 	];
 }
@@ -157,11 +161,9 @@ export function consumerClientInitialiser(
 						federatedCatalogueComponentType: engineCore.getRegisteredInstanceType(
 							"federatedCatalogueComponent",
 							["remote"]
-						),
-						dataspaceDataPlaneOfDataProviderComponentType: engineCore.getRegisteredInstanceType(
-							"dataspaceControlPlaneComponent",
-							["remote"]
 						)
+						// Provider reachability uses dataspaceControlPlane.negotiateAgreement/startDataTransfer
+						// with runtime endpoints from the catalogue — no separate data-plane client needed.
 					},
 					createConfig.options
 				)

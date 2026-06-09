@@ -211,25 +211,59 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	}
 
 	/**
-	 * Datasets handled by this DS App.
-	 * @param dataset the Dataset
-	 * @param tenantId the tenantId
-	 * @returns Datasets handled.
+	 * Prepare a dataset before it is stored and published to the federated catalogue.
+	 *
+	 * The control plane calls this hook during `POST /dataspace-control-plane/app-datasets`.
+	 * We inject the provider tenant into each distribution's `accessService` URL so downstream
+	 * DSP calls (negotiation, transfer) can route to the correct tenant partition.
+	 *
+	 * @param dataset The dataset payload from the publish request.
+	 * @param tenantId Raw provider tenant UUID from the control plane (not the trust VC hash).
+	 * @returns The dataset(s) to persist and forward to federated catalogue.
 	 */
 	public async datasetsHandled(
 		dataset: IDataspaceProtocolDataset,
 		tenantId: string
 	): Promise<IDataspaceProtocolDataset[]> {
-		// We modify here the original URL of the access service to include the encrypted tenant token
-		const distributions = ArrayHelper.fromObjectOrArray(dataset.distribution);
+		const datasetRecord = dataset as IDataspaceProtocolDataset & Record<string, unknown>;
 
-		const service = distributions[0].accessService as IDataspaceProtocolDataService;
-		const originalEndpointURL = service.endpointURL;
-		service.endpointURL = await this._urlTransformer.addEncryptedQueryParamToUrl(
-			originalEndpointURL,
+		// Publish payloads use expanded DCAT @context → compacted keys (dcat:distribution).
+		// The old code only read dataset.distribution and threw on the tutorial publish JSON.
+		const rawDistribution = datasetRecord.distribution ?? datasetRecord["dcat:distribution"];
+		const distributions = ArrayHelper.fromObjectOrArray(rawDistribution);
+		const distribution = distributions[0] as unknown as Record<string, unknown>;
+
+		// accessService may be a plain URL string (tutorial template) or a nested DataService
+		// object with endpointURL / dcat:endpointURL.
+		const rawAccessService = distribution.accessService ?? distribution["dcat:accessService"];
+
+		let plainUrl: string;
+		if (typeof rawAccessService === "string") {
+			plainUrl = rawAccessService;
+		} else {
+			const service = rawAccessService as IDataspaceProtocolDataService & Record<string, string>;
+			plainUrl = service.endpointURL ?? service["dcat:endpointURL"];
+		}
+
+		// Add x-enc-tenant-token to the control-plane URL. "Baking" (federated catalogue) is the
+		// same idea: on catalogue publish, FederatedCatalogueService appends an encrypted tenant
+		// query param to each distribution accessService so consumers know which tenant to call.
+		// TenantProcessor resolves tenants by raw UUID; a baked hash token → tenantNotFound on
+		// POST /rights-management/negotiations/request. See twin-federated-catalogue PR #83.
+		const tokenizedUrl = await this._urlTransformer.addEncryptedQueryParamToUrl(
+			plainUrl,
 			"tenant",
 			tenantId
 		);
+
+		// Write back using the same key shape the payload arrived with (DCAT-prefixed or short).
+		distribution["dcat:accessService"] = tokenizedUrl;
+		if (datasetRecord["dcat:distribution"]) {
+			datasetRecord["dcat:distribution"] = distribution;
+		} else {
+			datasetRecord.distribution = distribution as unknown as IDataspaceProtocolDataset["distribution"];
+		}
+
 		return [dataset];
 	}
 

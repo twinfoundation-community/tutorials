@@ -1,0 +1,27 @@
+{
+	"appId": "https://vtwt-1.virtualwatchtower.org",
+	"dataset": {
+		"@context": {
+			"dcat": "http://www.w3.org/ns/dcat#",
+			"dcterms": "http://purl.org/dc/terms/",
+			"odrl": "http://www.w3.org/ns/odrl/2/"
+		},
+		"@type": "dcat:Dataset",
+		"@id": "urn:uuid:tutorial-102-test",
+		"dcterms:title": "Tutorial 102 Test Dataset",
+		"dcterms:publisher": "REPLACE_WITH_PROVIDER_ORG_DID",
+		"odrl:hasPolicy": {
+			"@context": "http://www.w3.org/ns/odrl.jsonld",
+			"@type": "Offer",
+			"@id": "urn:policy:tutorial-102-offer",
+			"assigner": "REPLACE_WITH_PROVIDER_ORG_DID",
+			"target": "urn:uuid:tutorial-102-test",
+			"permission": [{ "action": "use" }]
+		},
+		"dcat:distribution": {
+			"@type": "dcat:Distribution",
+			"dcterms:format": "Http-Pull-Query-Format",
+			"dcat:accessService": "http://host.docker.internal:3000/dataspace-control-plane"
+		}
+	}
+}
