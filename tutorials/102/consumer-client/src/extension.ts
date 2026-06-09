@@ -39,16 +39,14 @@ export async function extensionInitialise(
 		}
 	];
 
-	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
+	nodeEngineConfig.types.federatedCatalogueComponent = [
 		{
-			type: DataspaceDataPlaneComponentType.Service,
-			options: {
-				config: {}
-			},
-			restPath: "dataspace"
+			type: FederatedCatalogueComponentType.Service,
+			restPath: "federated-catalogue",
+			isDefault: true
 		},
 		{
-			type: DataspaceDataPlaneComponentType.RestClient,
+			type: FederatedCatalogueComponentType.RestClient,
 			options: {
 				endpoint: "http://host.docker.internal:3000"
 			},
@@ -58,31 +56,39 @@ export async function extensionInitialise(
 
 	nodeEngineConfig.types.dataspaceControlPlaneComponent = [
 		{
+			type: DataspaceControlPlaneComponentType.Service,
+			options: {
+				config: {}
+			},
+			restPath: "dataspace-control-plane",
+			isDefault: true
+		},
+		{
 			type: DataspaceControlPlaneComponentType.RestClient,
 			options: {
 				endpoint: "http://host.docker.internal:3000"
 			},
-			features: ["remote"]
-		},
-		{
-			type: DataspaceControlPlaneComponentType.Service,
-			options: {
-				config: {}
-			}
+			features: ["remote"],
+			isMultiInstance: true
 		}
 	];
 
-	nodeEngineConfig.types.federatedCatalogueComponent = [
+	nodeEngineConfig.types.dataspaceDataPlaneComponent = [
 		{
-			type: FederatedCatalogueComponentType.Service,
-			restPath: "federated-catalogue"
+			type: DataspaceDataPlaneComponentType.Service,
+			options: {
+				config: {}
+			},
+			restPath: "dataspace",
+			isDefault: true
 		},
 		{
-			type: FederatedCatalogueComponentType.RestClient,
+			type: DataspaceDataPlaneComponentType.RestClient,
 			options: {
 				endpoint: "http://host.docker.internal:3000"
 			},
-			features: ["remote"]
+			features: ["remote"],
+			isMultiInstance: true
 		}
 	];
 }
