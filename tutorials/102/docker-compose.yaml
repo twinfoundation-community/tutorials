@@ -34,9 +34,13 @@ services:
       - ../../common/.env.local
       - ./.env.extensions
       - ./.env.multitenant
-    volumes: 
+    volumes:
       - twin_data:/var/lib/twin
       - ../../common/.env.local.bootstrap:/app/.env.local.bootstrap
+      # bootstrap-legacy reads TWIN_FEATURES (node-identity, admin user, wallet) from here.
+      # Without this mount, one-off bootstrap runs can finish without creating a tenant/API key.
+      - ../../common/.env.bootstrap-legacy:/app/.env.bootstrap-legacy
+      # Live-reload tutorial extensions after `npm run build` (node loads dist/es/index.js).
       - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
       - ./consumer-client:/app/node_modules/@twin-community.org/consumer-client
       - ./tutorial-data/provider.json:/app/provider.json

@@ -7,8 +7,15 @@ fi
 
 command='node src/index.js'
 
-bootstrap_env='--load-env=./.env.local.bootstrap'
+# Pair with docker-compose mount of .env.bootstrap-legacy — supplies TWIN_FEATURES for
+# bootstrap-legacy (node identity, admin user, wallet). Without it, bootstrap may not
+# create a tenant or API key.
+bootstrap_env='--load-env=./.env.local.bootstrap,./.env.bootstrap-legacy'
 final_command="$command $* $bootstrap_env"
 
-
-docker compose run --rm -it twin-node sh -c "${final_command}"
+# -it requires a TTY; CI and some terminals fail with "input device is not a TTY".
+if [ -t 0 ]; then
+    docker compose run --rm -it twin-node sh -c "${final_command}"
+else
+    docker compose run --rm twin-node sh -c "${final_command}"
+fi
