@@ -84,9 +84,6 @@ export async function extensionInitialise(
 		},
 		{
 			type: DataspaceDataPlaneComponentType.RestClient,
-			options: {
-				endpoint: "http://host.docker.internal:3000"
-			},
 			features: ["remote"],
 			isMultiInstance: true
 		}
@@ -156,10 +153,6 @@ export function consumerClientInitialiser(
 
 						federatedCatalogueComponentType: engineCore.getRegisteredInstanceType(
 							"federatedCatalogueComponent",
-							["remote"]
-						),
-						dataspaceDataPlaneOfDataProviderComponentType: engineCore.getRegisteredInstanceType(
-							"dataspaceControlPlaneComponent",
 							["remote"]
 						)
 					},

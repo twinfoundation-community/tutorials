@@ -10,9 +10,10 @@ import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/conte
 import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
-	type IDataspaceControlPlaneComponent,
-	type IDataspaceDataPlaneComponent
+	type IDataspaceDataPlaneComponent,
+	type IDataspaceControlPlaneComponent
 } from "@twin.org/dataspace-models";
+import { DataspaceDataPlaneComponentType } from "@twin.org/engine-types";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import type { FederatedCatalogueRestClient } from "@twin.org/federated-catalogue-rest-client";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
@@ -39,14 +40,11 @@ export class ConsumerClient implements IConsumerClientComponent {
 	private readonly _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
 	/* /rights-management?x-api-key=019e5f84a1657dd88e76e1f158abcda2*/
 
-	private readonly _DATASET_TYPE = "https://vocabulary.uncefact.org/Consignment";
+	private readonly _DATASET_ENTITY_TYPE = "https://vocabulary.uncefact.org/Consignment";
 
 	private readonly _logging: ILoggingComponent;
 
 	private readonly _dataspaceControlPlane: IDataspaceControlPlaneComponent;
-
-	// eslint-disable-next-line @typescript-eslint/no-unused-private-class-members
-	private readonly _providerDataPlane: IDataspaceDataPlaneComponent;
 
 	private readonly _trustComponent: ITrustComponent;
 
@@ -65,10 +63,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 		this._logging = ComponentFactory.get<ILoggingComponent>(
 			options?.loggingComponentType ?? "dataspaceControlPlane"
-		);
-
-		this._providerDataPlane = ComponentFactory.get<IDataspaceDataPlaneComponent>(
-			options?.dataspaceDataPlaneOfDataProviderComponentType ?? "dataspaceDataPlane"
 		);
 
 		this._trustComponent = ComponentFactory.get<ITrustComponent>(
@@ -135,7 +129,9 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 				const catalog = catalogResponse.result;
 				if (!Is.arrayValue(catalog.catalog) && !Is.arrayValue(catalog.dataset)) {
-					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
+					reject(
+						new Error(`Catalog query did not return any dataset: ${this._DATASET_ENTITY_TYPE}`)
+					);
 					return;
 				}
 				let dataset: IDataspaceProtocolDataset | undefined;
@@ -150,14 +146,18 @@ export class ConsumerClient implements IConsumerClientComponent {
 						catalog.catalog
 					)[0];
 					if (!Is.arrayValue(catalogItem.dataset)) {
-						reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
+						reject(
+							new Error(`Catalog query did not return any dataset: ${this._DATASET_ENTITY_TYPE}`)
+						);
 						return;
 					}
 					dataset = catalogItem.dataset[0] as IDataspaceProtocolDataset;
 				}
 
 				if (Is.undefined(dataset)) {
-					reject(new Error(`Catalog query did not return any dataset: ${this._DATASET_TYPE}`));
+					reject(
+						new Error(`Catalog query did not return any dataset: ${this._DATASET_ENTITY_TYPE}`)
+					);
 					return;
 				}
 
@@ -222,10 +222,35 @@ export class ConsumerClient implements IConsumerClientComponent {
 								) => {
 									await this._logging.log({
 										level: LogLevel.Debug,
-										message: `TransferProcess: ${consumerPid} Now started`,
+										message: `TransferProcess: ${consumerPid} Now started: channel: ${message.dataAddress?.endpoint}`,
 										source: this.className()
 									});
 									// Retrieve the data
+									const endpoint = message.dataAddress?.endpoint;
+									if (Is.undefined(endpoint)) {
+										reject(
+											new Error(`No data address supplied for transfer process ${consumerPid}`)
+										);
+										return;
+									}
+									const dataProviderDataPlane =
+										ComponentFactory.create<IDataspaceDataPlaneComponent>(
+											DataspaceDataPlaneComponentType.RestClient,
+											{
+												endpoint
+											}
+										);
+									const entities = await dataProviderDataPlane.getDataAssetEntities(
+										{
+											entityType: this._DATASET_ENTITY_TYPE
+										},
+										consumerPid,
+										undefined,
+										undefined,
+										token
+									);
+
+									resolve(entities);
 								},
 								onStateChanged: async (
 									consumerPid: string,
@@ -247,12 +272,14 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 							const providerEndpointTransfer = new URL(providerEndpoint);
 							providerEndpointTransfer.pathname += "dataspace-control-plane";
+
 							const consumerTransferCallback =
 								await this._urlTransformer.addEncryptedQueryParamToUrl(
 									`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
 									"tenant",
 									ids[ContextIdKeys.Tenant] as string
 								);
+
 							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
 								agreementId,
 								providerEndpointTransfer.toString(),
@@ -266,8 +293,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 								source: this.className(),
 								message: `Transfer Process Initiated. Consumer Pid: ${transferResult.consumerPid}`
 							});
-
-							resolve({});
 						} catch (error) {
 							await this._logging.log({
 								level: LogLevel.Error,
@@ -291,12 +316,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 					}
 				});
 
-				const consumerCallbackAddress = await this._urlTransformer.addEncryptedQueryParamToUrl(
-					`${this._CONSUMER_ENDPOINT}/rights-management`,
-					"tenant",
-					ids[ContextIdKeys.Tenant] as string
-				);
-
 				const negotiationProviderEndpoint = new URL(providerEndpoint);
 				negotiationProviderEndpoint.pathname += "rights-management";
 
@@ -305,7 +324,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 					datasetId,
 					datasetPolicyId,
 					negotiationProviderEndpoint.toString(),
-					consumerCallbackAddress,
+					this._CONSUMER_ENDPOINT,
 					token
 				);
 
