@@ -1,4 +1,4 @@
-name: 'TWIN Node 102'
+name: "TWIN Node 102"
 
 services:
   db:
@@ -11,7 +11,11 @@ services:
       MYSQL_USER: twin
       MYSQL_PASSWORD: twin
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u twin -ptwin --silent || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u twin -ptwin --silent || exit 1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,25 +27,32 @@ services:
       - ../../common/init:/docker-entrypoint-initdb.d
 
   twin-node:
-    image: twinfoundation/twin-node:0.0.3-next.50
+    # Published post-refactor image (org-identifiers #19/#203). next.56 carries node-core
+    # 0.0.3-next.56, rights-management-pnp 0.0.3-next.51 (incl. provider-org callback fix
+    # #181) and federated-catalogue 0.0.3-next.21 (object-form accessService bake fix #88).
+    # Verified 2026-06-16. To pin a newer build just bump the tag.
+    image: twinfoundation/twin-node:0.0.3-next.56
+    # Local build (only needed when Docker Hub lags the refactor — kept for reference):
+    # build:
+    #   context: ../../../twin-node
+    #   dockerfile: apps/node/tests/kenyaCommunityUseCaseDefaultArbiter/Dockerfile
     container_name: twin_node
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "3000:3000"
-    env_file: 
+    env_file:
       - ../../common/.env.local
       - ./.env.extensions
       - ./.env.multitenant
-    volumes: 
+    volumes:
       - twin_data:/var/lib/twin
       - ../../common/.env.local.bootstrap:/app/.env.local.bootstrap
       - ./dataspace-example-app:/app/node_modules/@twin-community.org/dataspace-example-app
       - ./consumer-client:/app/node_modules/@twin-community.org/consumer-client
       - ./tutorial-data/provider.json:/app/provider.json
       - ./tutorial-data/consumer.json:/app/consumer.json
-      
 volumes:
   mysql_data:
   twin_data:

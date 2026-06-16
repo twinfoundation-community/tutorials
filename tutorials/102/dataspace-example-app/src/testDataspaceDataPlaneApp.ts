@@ -1,6 +1,5 @@
 // Copyright 2025 IOTA Stiftung.
 // SPDX-License-Identifier: Apache-2.0.
-import type { IUrlTransformerComponent } from "@twin.org/api-models";
 import {
 	AuditableItemGraphContexts,
 	AuditableItemGraphTypes,
@@ -22,7 +21,6 @@ import {
 import { LogLevel, type ILoggingComponent } from "@twin.org/logging-models";
 import { nameof } from "@twin.org/nameof";
 import type {
-	IDataspaceProtocolDataService,
 	IDataspaceProtocolDataset
 } from "@twin.org/standards-dataspace-protocol";
 import type { IActivityStreamsActivity } from "@twin.org/standards-w3c-activity-streams";
@@ -106,12 +104,6 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	private readonly _logging?: ILoggingComponent;
 
 	/**
-	 * URL Transformer.
-	 * @internal
-	 */
-	private readonly _urlTransformer: IUrlTransformerComponent;
-
-	/**
 	 * Auditable Item Graph Component
 	 * @internal
 	 */
@@ -138,10 +130,6 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 			options?.loggingComponentType ?? "logging"
 		);
 		this._consignments = options?.consignments ?? DEFAULT_CONSIGNMENTS;
-
-		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
-			options?.urlTransformerComponentType ?? "url-transformer-service"
-		);
 
 		this._auditableItemGraph = ComponentFactory.get<IAuditableItemGraphComponent>(
 			options?.auditableItemGraphComponentType ?? "auditable-item-graph"
@@ -213,23 +201,13 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	/**
 	 * Datasets handled by this DS App.
 	 * @param dataset the Dataset
-	 * @param tenantId the tenantId
 	 * @returns Datasets handled.
 	 */
 	public async datasetsHandled(
-		dataset: IDataspaceProtocolDataset,
-		tenantId: string
+		dataset: IDataspaceProtocolDataset
 	): Promise<IDataspaceProtocolDataset[]> {
-		// We modify here the original URL of the access service to include the encrypted tenant token
-		const distributions = ArrayHelper.fromObjectOrArray(dataset.distribution);
-
-		const service = distributions[0].accessService as IDataspaceProtocolDataService;
-		const originalEndpointURL = service.endpointURL;
-		service.endpointURL = await this._urlTransformer.addEncryptedQueryParamToUrl(
-			originalEndpointURL,
-			"tenant",
-			tenantId
-		);
+		// The platform bakes ?organization=<org-did>
+		// into the distribution URLs at publish time, no app-side URL mutation needed.
 		return [dataset];
 	}
 
