@@ -269,7 +269,7 @@ export class ConsumerClient implements IConsumerClientComponent {
 								consumerIdentity
 							);
 
-							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
+							const transferResult = await this._dataspaceControlPlane.prepareTransfer(
 								agreementId,
 								providerEndpointTransfer.toString(),
 								consumerTransferCallback,
