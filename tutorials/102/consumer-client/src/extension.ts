@@ -58,7 +58,12 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.Service,
 			options: {
-				config: {}
+				config: {
+					// This override REPLACES the env-built control-plane config, so the
+					// data plane path must be forwarded or pull transfers fail at
+					// startTransfer with "pullTransfersNotSupported" (walkthrough Bug 1b).
+					dataPlanePath: process.env.TWIN_DATASPACE_DATA_PLANE_PATH ?? "dataspace/entities"
+				}
 			},
 			restPath: "dataspace-control-plane",
 			isDefault: true

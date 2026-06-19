@@ -5,7 +5,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import type { IUrlTransformerComponent } from "@twin.org/api-models";
+import { HttpUrlHelper } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
 import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
@@ -29,7 +29,7 @@ import {
 	type IDataspaceProtocolOffer,
 	type IDataspaceProtocolTransferStartMessage
 } from "@twin.org/standards-dataspace-protocol";
-import { TrustHelper, type ITrustComponent } from "@twin.org/trust-models";
+import type { ITrustComponent } from "@twin.org/trust-models";
 import type { IConsumerClientComponent } from "./IConsumerClientComponent.js";
 import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstructorOptions.js";
 
@@ -49,8 +49,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 	private readonly _trustComponent: ITrustComponent;
 
 	private readonly _federatedCatalogue: IFederatedCatalogueComponent;
-
-	private readonly _urlTransformer: IUrlTransformerComponent;
 
 	/**
 	 * Create a new instance.
@@ -72,10 +70,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 		this._federatedCatalogue = ComponentFactory.get<IFederatedCatalogueComponent>(
 			options?.federatedCatalogueComponentType ?? "federatedCatalogue"
 		);
-
-		this._urlTransformer = ComponentFactory.get<IUrlTransformerComponent>(
-			options?.urlTransformerComponentType ?? "url-transformer-service"
-		);
 	}
 
 	public className(): string {
@@ -91,17 +85,11 @@ export class ConsumerClient implements IConsumerClientComponent {
 
 				console.log("Before Catalog");
 
-				// Workaround until we get the organization identity
+				// The trust token is identity-only and
+				// the identity IS the tenant's organization DID from the request context.
 				const consumerIdentity = ids[ContextIdKeys.Organization] as string;
 
-				// Several workarounds here due to several improvements needed at the DS Protocol implementation side
-				const token = await this._trustComponent.generate(
-					ids[ContextIdKeys.Node] as string,
-					undefined,
-					{},
-					TrustHelper.hashTenantId(ids[ContextIdKeys.Tenant]),
-					consumerIdentity
-				);
+				const token = await this._trustComponent.generate(consumerIdentity, undefined, {});
 
 				// Query the federated Catalogue
 				const catalogResponse = await (
@@ -273,14 +261,15 @@ export class ConsumerClient implements IConsumerClientComponent {
 							const providerEndpointTransfer = new URL(providerEndpoint);
 							providerEndpointTransfer.pathname += "dataspace-control-plane";
 
-							const consumerTransferCallback =
-								await this._urlTransformer.addEncryptedQueryParamToUrl(
-									`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
-									"tenant",
-									ids[ContextIdKeys.Tenant] as string
-								);
+							// Callbacks route by the cleartext org DID, not an
+							// encrypted tenant token.
+							const consumerTransferCallback = HttpUrlHelper.addQueryStringParam(
+								`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
+								ContextIdKeys.Organization,
+								consumerIdentity
+							);
 
-							const transferResult = await this._dataspaceControlPlane.startDataTransfer(
+							const transferResult = await this._dataspaceControlPlane.prepareTransfer(
 								agreementId,
 								providerEndpointTransfer.toString(),
 								consumerTransferCallback,
@@ -303,7 +292,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 						}
 					},
 					// Handles on failed CN
-					// ///////////////////////////
 					onFailed: async (negotiationId: string, reason: string) => {
 						await this._logging.log({
 							level: LogLevel.Error,

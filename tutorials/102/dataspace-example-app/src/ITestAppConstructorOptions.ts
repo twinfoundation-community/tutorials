@@ -12,11 +12,6 @@ export interface ITestAppConstructorOptions {
 	 */
 	loggingComponentType?: string;
 
-	/**
-	 * URL transformer component type.
-	 * @default url-transformer-service
-	 */
-	urlTransformerComponentType?: string;
 
 	/**
 	 * Auditable Item Graph Component type.

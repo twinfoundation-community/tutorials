@@ -1,0 +1,1113 @@
+{
+	"info": {
+		"_postman_id": "twin-102-dsp",
+		"name": "TWIN 102 \u2014 DSP Full Flow",
+		"description": "End-to-end DSP data transfer for tutorials/102. Drives login \u2192 trust JWT \u2192 ODRL offer \u2192 dataset \u2192 catalogue query \u2192 negotiate \u2192 requestTransfer \u2192 startTransfer \u2192 fetch data. Each request's Tests tab extracts the values the next request needs.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "A. Setup (provider tenant)",
+			"item": [
+				{
+					"name": "A1. Login as provider",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+									"const match = setCookie.match(/access_token=([^;]+)/);",
+									"pm.test('access_token cookie returned', () => pm.expect(match).to.not.be.null);",
+									"if (match) {",
+									"    pm.environment.set('prov_session_jwt', match[1]);",
+									"    console.log('Saved prov_session_jwt');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{prov_email}}\",\n  \"password\": \"{{prov_password}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/authentication/login?x-api-key={{prov_api_key}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							],
+							"query": [
+								{
+									"key": "x-api-key",
+									"value": "{{prov_api_key}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "A2. Mint provider trust JWT",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"const jwt = j.jwt || (j.body && j.body.jwt) || (j.verifiableCredential && j.verifiableCredential.jwt);",
+									"pm.test('jwt returned', () => pm.expect(jwt).to.be.a('string'));",
+									"if (typeof jwt === 'string' && jwt.length > 10) {",
+									"    pm.environment.set('prov_trust_jwt', jwt);",
+									"    pm.collectionVariables.set('prov_trust_jwt', jwt);",
+									"    console.log('Saved prov_trust_jwt (len=' + jwt.length + ')');",
+									"} else {",
+									"    console.error('JWT not found in response. Top-level keys:', Object.keys(j));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{prov_session_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"subject\": { \"id\": \"{{prov_did}}\" }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/identity/{{prov_did}}/verifiable-credential/trust-assertion?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"identity",
+								"{{prov_did}}",
+								"verifiable-credential",
+								"trust-assertion"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "A3. Create ODRL Offer (skip if exists)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// 200 first time, 409 if already exists \u2014 both are fine for the next step.",
+									"pm.test('created or already exists', () => pm.expect([200, 201, 204, 409, 400]).to.include(pm.response.code));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{prov_session_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": \"http://www.w3.org/ns/odrl.jsonld\",\n  \"@type\": \"Offer\",\n  \"@id\": \"{{offer_id}}\",\n  \"assigner\": \"{{prov_did}}\",\n  \"target\": \"{{dataset_id}}\",\n  \"permission\": [\n    { \"target\": \"{{dataset_id}}\", \"action\": \"use\" }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/rights-management/policy/admin?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"policy",
+								"admin"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "A4. Register Dataset (skip if exists)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('created or already exists', () => pm.expect([200, 201, 204, 409, 400]).to.include(pm.response.code));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{prov_session_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"appId\": \"{{app_id}}\",\n\t\"dataset\": {\n\t\t\"@context\": {\n\t\t\t\"dcat\": \"http://www.w3.org/ns/dcat#\",\n\t\t\t\"dcterms\": \"http://purl.org/dc/terms/\",\n\t\t\t\"odrl\": \"http://www.w3.org/ns/odrl/2/\"\n\t\t},\n\t\t\"@type\": \"dcat:Dataset\",\n\t\t\"@id\": \"{{dataset_id}}\",\n\t\t\"dcterms:title\": \"Test Dataset 1342\",\n\t\t\"dcterms:type\": \"{{dataset_type}}\",\n\t\t\"dcterms:publisher\": \"{{prov_did}}\",\n\t\t\"dcat:distribution\": {\n\t\t\t\"@type\": \"dcat:Distribution\",\n\t\t\t\"dcterms:format\": \"application/json\",\n\t\t\t\"dcat:accessService\": {\n\t\t\t\t\"@id\": \"{{host_internal}}/rights-management\",\n\t\t\t\t\"@type\": \"dcat:DataService\",\n\t\t\t\t\"dcat:endpointURL\": \"{{host_internal}}/\"\n\t\t\t}\n\t\t},\n\t\t\"odrl:hasPolicy\": {\n\t\t\t\"@context\": \"http://www.w3.org/ns/odrl.jsonld\",\n\t\t\t\"@type\": \"Offer\",\n\t\t\t\"@id\": \"{{offer_id}}\",\n\t\t\t\"assigner\": \"{{prov_did}}\",\n\t\t\t\"target\": \"{{dataset_id}}\",\n\t\t\t\"permission\": [\n\t\t\t\t{\n\t\t\t\t\t\"target\": \"{{dataset_id}}\",\n\t\t\t\t\t\"action\": \"use\"\n\t\t\t\t}\n\t\t\t]\n\t\t}\n\t}\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/dataspace-control-plane/app-datasets?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"dataspace-control-plane",
+								"app-datasets"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "B. Setup (consumer tenant)",
+			"item": [
+				{
+					"name": "B1. Login as consumer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+									"const match = setCookie.match(/access_token=([^;]+)/);",
+									"pm.test('access_token cookie returned', () => pm.expect(match).to.not.be.null);",
+									"if (match) {",
+									"    pm.environment.set('cons_session_jwt', match[1]);",
+									"    console.log('Saved cons_session_jwt');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{cons_email}}\",\n  \"password\": \"{{cons_password}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/authentication/login?x-api-key={{cons_api_key}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							],
+							"query": [
+								{
+									"key": "x-api-key",
+									"value": "{{cons_api_key}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "B2. Mint consumer trust JWT",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"const jwt = j.jwt || (j.body && j.body.jwt) || (j.verifiableCredential && j.verifiableCredential.jwt);",
+									"pm.test('jwt returned', () => pm.expect(jwt).to.be.a('string'));",
+									"if (typeof jwt === 'string' && jwt.length > 10) {",
+									"    pm.environment.set('cons_trust_jwt', jwt);",
+									"    pm.collectionVariables.set('cons_trust_jwt', jwt);",
+									"    console.log('Saved cons_trust_jwt (len=' + jwt.length + ')');",
+									"} else {",
+									"    console.error('JWT not found in response. Top-level keys:', Object.keys(j));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_session_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"subject\": { \"id\": \"{{cons_did}}\" }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/identity/{{cons_did}}/verifiable-credential/trust-assertion?organization={{cons_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"identity",
+								"{{cons_did}}",
+								"verifiable-credential",
+								"trust-assertion"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{cons_did}}"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "C. DSP transfer flow",
+			"item": [
+				{
+					"name": "C1. Query federated catalogue",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"const result = j.result || j;",
+									"const ds = (result.dataset || [])[0];",
+									"pm.test('dataset returned', () => pm.expect(ds).to.not.be.undefined);",
+									"if (ds) {",
+									"    if (ds['@id']) pm.environment.set('dataset_id', ds['@id']);",
+									"    if (ds.hasPolicy && ds.hasPolicy[0] && ds.hasPolicy[0]['@id']) {",
+									"        pm.environment.set('offer_id', ds.hasPolicy[0]['@id']);",
+									"    }",
+									"    console.log('dataset_id =', pm.environment.get('dataset_id'));",
+									"    console.log('offer_id   =', pm.environment.get('offer_id'));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\"https://w3id.org/dspace/2025/1/context.jsonld\"],\n  \"@type\": \"CatalogRequestMessage\",\n  \"filter\": [\n    { \"@type\": \"FilterByMetadata\", \"dcterms:type\": \"{{dataset_type}}\" }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/federated-catalogue/request?organization={{cons_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"federated-catalogue",
+								"request"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{cons_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "C2. Initiate negotiation (consumer \u2192 provider)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Generate a fresh consumerPid for this negotiation",
+									"function uuid() {",
+									"  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>",
+									"    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c/4).toString(16));",
+									"}",
+									"pm.variables.set('fresh_uuid', 'urn:uuid:' + uuid());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('negotiation returned', () => pm.expect(j.providerPid).to.be.a('string'));",
+									"pm.environment.set('negotiation_id', j.providerPid);",
+									"console.log('negotiation_id =', j.providerPid, 'state =', j.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\"https://w3id.org/dspace/2025/1/context.jsonld\"],\n  \"@type\": \"ContractRequestMessage\",\n  \"consumerPid\": \"{{fresh_uuid}}\",\n  \"offer\": {\n    \"@type\": \"Offer\",\n    \"@id\": \"{{offer_id}}\",\n    \"target\": \"{{dataset_id}}\"\n  },\n  \"callbackAddress\": \"{{host_internal}}/rights-management?organization={{cons_did}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/request?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"request"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "C3. Poll negotiation until FINALIZED",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"console.log('state =', j.state);",
+									"pm.test('finalized', () => pm.expect(j.state).to.eql('FINALIZED'));",
+									"if (j.state === 'FINALIZED' && j.agreement) {",
+									"    pm.environment.set('agreement_id', j.agreement['@id']);",
+									"    console.log('agreement_id =', j.agreement['@id']);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{negotiation_id}}?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{negotiation_id}}"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "C4. Request transfer (pull mode)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"function uuid() {",
+									"  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>",
+									"    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c/4).toString(16));",
+									"}",
+									"pm.environment.set('consumer_pid', 'urn:uuid:' + uuid());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('transfer created', () => pm.expect(j.providerPid).to.be.a('string'));",
+									"pm.environment.set('provider_pid', j.providerPid);",
+									"pm.environment.set('provider_pid_enc', encodeURIComponent(j.providerPid));",
+									"console.log('provider_pid =', j.providerPid, 'state =', j.state);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\"https://w3id.org/dspace/2025/1/context.jsonld\"],\n  \"@type\": \"TransferRequestMessage\",\n  \"agreementId\": \"{{agreement_id}}\",\n  \"consumerPid\": \"{{consumer_pid}}\",\n  \"callbackAddress\": \"{{host_internal}}/dataspace-control-plane?organization={{cons_did}}\",\n  \"format\": \"HttpData-PULL\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/dataspace-control-plane/transfers/request?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"dataspace-control-plane",
+								"transfers",
+								"request"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "C-shortcut. Drive negotiation+requestTransfer via consumer-client extension",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.expect(pm.response.code).to.eql(200));",
+									"",
+									"// The consumer-client extension runs negotiateAgreement + requestTransfer in-process",
+									"// and stores the resulting transfer-process row in MySQL with state=REQUESTED.",
+									"// Postman cannot read MySQL directly \u2014 you must now run this in your terminal:",
+									"//",
+									"//   docker exec mysql8_container mysql -utwin -ptwin twin -e \\",
+									"//     \"SELECT consumerPid, providerPid FROM \\`transfer-process\\` WHERE state='REQUESTED' \\",
+									"//      ORDER BY dateCreated DESC LIMIT 1;\"",
+									"//",
+									"// Then open the environment (eye icon \u2192 Edit) and set:",
+									"//   consumer_pid      = <consumerPid from MySQL>",
+									"//   provider_pid      = <providerPid from MySQL>",
+									"//   provider_pid_enc  = <providerPid with ':' \u2192 '%3A'>",
+									"//",
+									"// Then run C5.",
+									"//",
+									"// Why this is necessary: DSP requires consumer-side state to be bootstrapped",
+									"// in-process before the negotiation/transfer messages reach the provider.",
+									"// See dsp-postman-walkthrough.md \u2192 'Why C2/C3/C4 aren't 100% Postman-able'.",
+									"console.log('Now read the latest REQUESTED transfer-process row from MySQL \u2014 see Tests script for the exact command');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_session_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/consumer-client/query-data?organization={{cons_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"consumer-client",
+								"query-data"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{cons_did}}"
+								}
+							]
+						},
+						"description": "REPLACES C2 + C3 + C4 \u2014 those steps fail purely from Postman because the consumer-side DSP state machine has to be bootstrapped in-process (no REST endpoint creates the consumer-side negotiation/transfer rows). This GET drives the entire bootstrap inside the node via the tutorial's consumer-client extension. Returns HTTP 200 {} once the negotiation has FINALIZED and a transfer-process row exists. See Tests script for the MySQL query you must run next."
+					}
+				},
+				{
+					"name": "C5. Start transfer (capture dataAddress + access token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('TransferStartMessage', () => pm.expect(j['@type']).to.eql('TransferStartMessage'));",
+									"pm.test('dataAddress present', () => pm.expect(j.dataAddress).to.not.be.undefined);",
+									"if (j.dataAddress) {",
+									"    pm.environment.set('data_endpoint', j.dataAddress.endpoint);",
+									"    const authProp = (j.dataAddress.endpointProperties || []).find(p => p.name === 'authorization');",
+									"    if (authProp) pm.environment.set('access_token', authProp.value);",
+									"    console.log('data_endpoint =', j.dataAddress.endpoint);",
+									"    console.log('access_token  =', (authProp && authProp.value || '').slice(0, 60) + '...');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{prov_trust_jwt}}",
+								"description": "NOTE: uses PROVIDER trust JWT \u2014 the agreement's assigner is the provider, so startTransfer's authorization check requires a provider-signed token."
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\"https://w3id.org/dspace/2025/1/context.jsonld\"],\n  \"@type\": \"TransferStartMessage\",\n  \"consumerPid\": \"{{consumer_pid}}\",\n  \"providerPid\": \"{{provider_pid}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base}}/dataspace-control-plane/transfers/{{provider_pid_enc}}/start?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"dataspace-control-plane",
+								"transfers",
+								"{{provider_pid_enc}}",
+								"start"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "C6. Fetch data (GET /dataspace/entities)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.expect(pm.response.code).to.eql(200));",
+									"const j = pm.response.json();",
+									"pm.test('ItemList returned', () => pm.expect(j.type || j['@type']).to.eql('ItemList'));",
+									"console.log('entities:', (j.itemListElement || []).length);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"description": "NOTE: bearer is the access_token from C5's dataAddress.endpointProperties, NOT a session or trust JWT."
+							}
+						],
+						"url": {
+							"raw": "{{data_endpoint}}&consumerPid={{consumer_pid}}&type={{dataset_type}}",
+							"host": [
+								"{{data_endpoint}}&consumerPid={{consumer_pid}}&type={{dataset_type}}"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "C-poll. Polling-only negotiation (rights-management \u2265 0.0.3-next.41)",
+			"description": "Polling-only variant of the negotiation flow. Demonstrates that \u2014 post the `callbackAddress optional` + always-advance-state change in `rights-management-pnp-service` (0.0.3-next.41 onward) \u2014 the negotiation state machine can be driven entirely from Postman by omitting `callbackAddress` and polling the provider's `GET /negotiations/:id` between consumer-driven events (ACCEPTED, agreement verification).\n\n**Scope (updated 2026-06-12, verified on next.53):** the FULL pull flow. The public `GET /negotiations/:id` is DSP-spec-minimal (no agreement), so after C3e' run C3f' (provider admin route) to capture `agreement_id`, then continue C4 (callbackAddress is schema-required in the body) \u2192 C5 \u2192 C6 \u2014 all pure REST, no consumer-client extension needed. The C-shortcut remains as a convenience.\n\n**Requires:** a TWIN node with `@twin.org/rights-management-pnp-service` >= `0.0.3-next.41`. Older nodes will silently stall at REQUESTED because state advancement was previously gated on a callbackAddress being present.",
+			"item": [
+				{
+					"name": "C2'. Initiate negotiation (no callbackAddress, polling-only)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/request?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"request"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\n    \"https://w3id.org/dspace/2025/1/context.jsonld\"\n  ],\n  \"@type\": \"ContractRequestMessage\",\n  \"consumerPid\": \"{{fresh_uuid}}\",\n  \"offer\": {\n    \"@type\": \"Offer\",\n    \"@id\": \"{{offer_id}}\",\n    \"target\": \"{{dataset_id}}\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Fresh consumerPid for this run",
+									"function uuid() {",
+									"  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>",
+									"    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c/4).toString(16));",
+									"}",
+									"pm.variables.set('fresh_uuid', 'urn:uuid:' + uuid());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('negotiation accepted', () => pm.expect(j.providerPid).to.be.a('string'));",
+									"pm.environment.set('poll_negotiation_id', j.providerPid);",
+									"pm.environment.set('poll_provider_pid',  j.providerPid);",
+									"pm.environment.set('poll_consumer_pid',  j.consumerPid);",
+									"console.log('poll negotiation_id =', j.providerPid, 'state =', j.state);"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "C3a'. Poll until OFFERED",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{poll_negotiation_id}}?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{poll_negotiation_id}}"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"console.log('state =', j.state);",
+									"pm.test('offered', () => pm.expect(j.state).to.eql('OFFERED'));",
+									"if (j.state === 'OFFERED' && j.offer) {",
+									"    pm.environment.set('poll_offer_id', j.offer['@id']);",
+									"    console.log('offer captured:', j.offer['@id']);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "C3b'. Send ACCEPTED event (consumer accepts the offer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{poll_negotiation_id}}/events?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{poll_negotiation_id}}",
+								"events"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\n    \"https://w3id.org/dspace/2025/1/context.jsonld\"\n  ],\n  \"@type\": \"ContractNegotiationEventMessage\",\n  \"providerPid\": \"{{poll_provider_pid}}\",\n  \"consumerPid\": \"{{poll_consumer_pid}}\",\n  \"event\": \"ACCEPTED\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				},
+				{
+					"name": "C3c'. Poll until AGREED",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{poll_negotiation_id}}?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{poll_negotiation_id}}"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"console.log('state =', j.state);",
+									"pm.test('agreed', () => pm.expect(j.state).to.eql('AGREED'));",
+									"if (j.state === 'AGREED' && j.agreement) {",
+									"    pm.environment.set('poll_agreement_id', j.agreement['@id']);",
+									"    console.log('agreement captured:', j.agreement['@id']);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "C3d'. Send agreement verification (consumer verifies)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{poll_negotiation_id}}/agreement/verification?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{poll_negotiation_id}}",
+								"agreement",
+								"verification"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"@context\": [\n    \"https://w3id.org/dspace/2025/1/context.jsonld\"\n  ],\n  \"@type\": \"ContractAgreementVerificationMessage\",\n  \"providerPid\": \"{{poll_provider_pid}}\",\n  \"consumerPid\": \"{{poll_consumer_pid}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					}
+				},
+				{
+					"name": "C3e'. Poll until FINALIZED",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cons_trust_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/{{poll_negotiation_id}}?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"{{poll_negotiation_id}}"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"console.log('state =', j.state);",
+									"pm.test('finalized', () => pm.expect(j.state).to.eql('FINALIZED'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "C3f'. Fetch agreement id (provider admin route)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{prov_session_jwt}}"
+							}
+						],
+						"url": {
+							"raw": "{{base}}/rights-management/negotiations/admin/{{poll_negotiation_id}}?organization={{prov_did}}",
+							"host": [
+								"{{base}}"
+							],
+							"path": [
+								"rights-management",
+								"negotiations",
+								"admin",
+								"{{poll_negotiation_id}}"
+							],
+							"query": [
+								{
+									"key": "organization",
+									"value": "{{prov_did}}"
+								}
+							]
+						},
+						"description": "The public DSP GET /negotiations/:id is spec-minimal (pids + state only). The agreement lives on the stored negotiation; in polling-only mode (no callbackAddress) fetch it via the admin route, then use agreement['@id'] as {{agreement_id}} for C4. Provider session JWT because the record lives in the provider partition."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j.agreement && j.agreement['@id']) { pm.environment.set('agreement_id', j.agreement['@id']); }"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
