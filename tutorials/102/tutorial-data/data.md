@@ -1,106 +1,52 @@
+> Created: 2026-06-11
+> Last updated: 2026-06-19
+
 # Test Data
+
+Bootstrapped fresh on `twinfoundation/twin-node:0.0.3-next.62` (2026-06-19). All identities are
+`did:entity-storage` (local bootstrap, no testnet). The live credentials are also mirrored in
+`postman/TWIN-102-DSP.postman_environment.json`.
 
 ## Node Identity
 
-```sh
-did:entity-storage:0x55f61c5fe23ac3c2bf5da451109b7a79ee705d1afd4bedb2ddd6969478a09c4f
-```
+DID: `did:entity-storage:0xcfc8af81329d09ac6fb505be6c479a9610b91a07685f9ab321e28069365ff76e`
 
-## Tenants
+Mnemonic: `attitude gospel share taste episode dish seminar buyer duck proud usual decline sample receive foot mushroom lucky endless valid become renew sugar just earn`
 
-Tenant 1: (Data Provider)
+## Provider tenant (Data Provider)
 
-```sh
-➡️  Creating tenant
+- Tenant ID: `019edfc6c9517d558707f37cdd5ce348`
+- API Key: `019edfc6c9517b53bd2ecbe367fc1ba1`
+- Org DID (`prov_did`): `did:entity-storage:0x541bfcad1c9e9bbd56286431a9c0bf5901e17dfdba59015efe41da0f093a32ab`
+- User DID: `did:entity-storage:0xb7e43c1d036a0b9e0f25d0a0fc3479db373e8881172eb76988227e71bf04953c`
+- Login: `prov@example.com` / `yM5?NgPPAio+TmWx`
 
-Tenant ID: 019e8c88a4fa77fc89a6334731fa30cd
-API Key: 019e8c88a4fa70408a291977891260d3
-Label:
-Public Origin:
+## Consumer tenant (Data Consumer)
 
-Encrypted tenant Id: JFAxlv3DHZYNHDmwu-oaxMGHC9roJbldXJqygidSiSqT5Tn7SY2kjzs1jAy9BxPTDJrfUmQW2QgK-ogOJrklr2cm-io
-```
+- Tenant ID: `019edfc7173776e38d83f6c5fb279630`
+- API Key: `019edfc7173772cc8dc11acef5e9fba8`
+- Org DID (`cons_did`): `did:entity-storage:0x7deed401ea97d08446313b57fb208b506bca86c47bfd2ca615e4a41df4d37806`
+- User DID: `did:entity-storage:0x19d51ec767a199e6494c08816cccd9a904ebd508d7397707d4c306c23ceba0de`
+- Login: `cons@example.com` / `yM5?NgPPAio+TmWx`
 
-Tenant 2: (Data Consumer)
+## Dataset / Offer (published by the provider)
 
-```sh
-Tenant ID: 019e8c89185578118f3c165bde255ce9
-API Key: 019e8c8918547bda894c44b4ab614265
-Label:
-Public Origin:
+- Dataset ID: `https://twin.example.org/dataset-1342`
+- Dataset type: `https://vocabulary.uncefact.org/Consignment`
+- Offer ID: `urn:policy:test-policy-offer-1`
+- App ID: `https://vtwt-1.virtualwatchtower.org`
 
-Encrypted tenant Id:  IvNJXSBm2GkCGPpfKClfvGB4UBsBUkiVlguW1Ki5qTexJXj4eiVjPeTl6fxBZJ1CSCJoqU4XttTqxirqr4AVfxUtgN4
+## Bootstrap (script way)
 
-```
+Node + tenants + orgs + users were created via the CLI
+(`docker compose run --rm -T twin-node sh -c "node src/index.js <cmd> --load-env=./.env.local.bootstrap"`):
 
-## Organization Identities
+1. `identity-create` (node) → node DID
+2. `identity-verification-method-create` for `sign-0`, `auth-signing`, `trust-assertion`
+3. `node-set-identity --identity=<node>`
+4. `vault-key-create --identity=<node> --key-id="param-encryption" --key-type="ChaCha20Poly1305"`
+5. Per tenant: `identity-create` (org) + `sign-0` + `trust-assertion` (`--verification-method-type="assertionMethod"`) → `tenant-create --organization-id=<org> --label="provider|consumer"` → `identity-create` (user) → `user-create --user-identity=<user> --organization-identity=<org> --email=... --password=... --scope="tenant-admin" --tenant-id=<tenant>`
 
-### Organization 1 (Data Provider)
-
-Identity:
-
-```sh
-did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f
-```
-
-User Identity:
-
-```sh
-did:entity-storage:0x25382b99dd20ca68e76ff378e8cde2247cbd9ea256e805d1dd2975aef632e4c8
-```
-
-Login:
-
-```sh
-Email: jcantera@example.com
-Password: yM5?NgPPAio+TmWx
-```
-
-Command line:
-
-```sh
-./twin-node.sh  user-create --user-identity="did:entity-storage:0x25382b99dd20ca68e76ff378e8cde2247cbd9ea256e805d1dd2975aef632e4c8" --organization-identity="did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f" --email="jcantera@example.com" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019e8c88a4fa77fc89a6334731fa30cd"
-```
-
-### Organization 2 (Data Consumer)
-
-Identity:
-
-```sh
-did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431
-```
-
-User Identity:
-
-```sh
-did:entity-storage:0xd9096602b0d2c4ab435bf588d7a49ac49017f50d77d5264a5a6346a591b84454
-```
-
-Login:
-
-```sh
-Email: damon@example.org
-Password: yM5?NgPPAio+TmWx
-```
-
-Command line:
-
-```sh
-/twin-node.sh  user-create --user-identity="did:entity-storage:0xd9096602b0d2c4ab435bf588d7a49ac49017f50d77d5264a5a6346a591b84454" --organization-identity="did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431" --email="damon@example.org" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019e8c89185578118f3c165bde255ce9"
-```
-
-## Verifiable Credential Creation
-
-Needed for data exchange operations:
-
-Data Consumer:
-
-```sh
-./twin-node.sh identity-verifiable-credential-create --identity="did:entity-storage:0xf0a778c02c062482b3e4e446f6b441fc5e4853b6f5ebced1f00fc386a1375431" --verification-method-id="trust-assertion" --subject-json="./consumer.json"
-```
-
-Data Provider:
-
-```sh
-./twin-node.sh identity-verifiable-credential-create --identity="did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f" --verification-method-id="trust-assertion" --subject-json="./provider.json"
-```
+Offer + dataset are published over REST (Postman A3/A4). Note: `node-set-tenant` from the old HOWTO
+no longer exists; multi-tenant needs no node tenant. `tenant-create` requires `--organization-id`
+(the org DID must be created first).

@@ -5,7 +5,6 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import { HttpUrlHelper } from "@twin.org/api-models";
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
 import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
@@ -37,9 +36,6 @@ import type { IConsumerClientConstructorOptions } from "./IConsumerClientConstru
  * Test App Activity Handler.
  */
 export class ConsumerClient implements IConsumerClientComponent {
-	private readonly _CONSUMER_ENDPOINT = "http://host.docker.internal:3000";
-	/* /rights-management?x-api-key=019e5f84a1657dd88e76e1f158abcda2*/
-
 	private readonly _DATASET_ENTITY_TYPE = "https://vocabulary.uncefact.org/Consignment";
 
 	private readonly _logging: ILoggingComponent;
@@ -261,18 +257,9 @@ export class ConsumerClient implements IConsumerClientComponent {
 							const providerEndpointTransfer = new URL(providerEndpoint);
 							providerEndpointTransfer.pathname += "dataspace-control-plane";
 
-							// Callbacks route by the cleartext org DID, not an
-							// encrypted tenant token.
-							const consumerTransferCallback = HttpUrlHelper.addQueryStringParam(
-								`${this._CONSUMER_ENDPOINT}/dataspace-control-plane`,
-								ContextIdKeys.Organization,
-								consumerIdentity
-							);
-
 							const transferResult = await this._dataspaceControlPlane.prepareTransfer(
 								agreementId,
 								providerEndpointTransfer.toString(),
-								consumerTransferCallback,
 								format,
 								token
 							);
@@ -312,7 +299,6 @@ export class ConsumerClient implements IConsumerClientComponent {
 					datasetId,
 					datasetPolicyId,
 					negotiationProviderEndpoint.toString(),
-					this._CONSUMER_ENDPOINT,
 					token
 				);
 
