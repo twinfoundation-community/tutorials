@@ -1,0 +1,317 @@
+# TWIN Node on Kubernetes - MySQL data store, all-local (entity-storage) profile.
+#
+# This is the Kubernetes equivalent of the docker-compose setup in tutorial 101. The node
+# configuration is the shared common/.env.local (mounted at /app/.env via a ConfigMap);
+# only the handful of settings that differ in-cluster are set as real container env vars
+# below. The two things that differ from a naive port of the compose file - and that you
+# are most likely to trip over - are called out inline:
+#
+#   1. Bootstrap runs as an initContainer that performs the full bootstrap sequence from
+#      common/HOWTO-bootstrap-node.md, INCLUDING node-set-identity / node-set-tenant.
+#      `bootstrap-legacy` alone creates the node identity but never SETS it, which makes the
+#      server fail with "node identity is enabled in config but is not set".
+#
+#   2. TWIN_STORAGE_FILE_ROOT is set as a real container env var pointing at the mounted
+#      volume. The image bakes TWIN_STORAGE_FILE_ROOT=/twin-node/data, which OVERRIDES the
+#      value in the mounted .env file (a .env file does not override an already-set
+#      process.env). The engine state file - where node-set-identity records the node
+#      identity - lives under this root, so if it is not on the shared volume the bootstrap
+#      writes it to an ephemeral path the server never sees. The same override mechanism is
+#      used for the other in-cluster settings (MySQL host, public origin, multi-tenant).
+#
+# See ./README.md for how to create the env ConfigMap and apply this manifest.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: twin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twin-data
+  namespace: twin
+  labels:
+    app: twin-node
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twin-node-db-pvc
+  namespace: twin
+  labels:
+    app: twin-node-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: twin-node-db
+  namespace: twin
+  labels:
+    app: twin-node-db
+spec:
+  serviceName: twin-node-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twin-node-db
+  template:
+    metadata:
+      labels:
+        app: twin-node-db
+    spec:
+      containers:
+        - name: twin-node-db
+          image: mysql:8.4.7
+          args:
+            - "--skip-log-bin"
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root"
+            - name: MYSQL_USER
+              value: twin
+            - name: MYSQL_PASSWORD
+              value: twin
+            # Creating the database here means the `twin` user is automatically granted
+            # privileges on it (see the GRANT note in ./README.md).
+            - name: MYSQL_DATABASE
+              value: twin
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: twin-mysql-persistent-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: twin-mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: twin-node-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twin-node-db
+  namespace: twin
+  labels:
+    app: twin-node-db
+spec:
+  ports:
+    - name: mysql
+      port: 3306
+  clusterIP: None
+  selector:
+    app: twin-node-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twin-node
+  namespace: twin
+  labels:
+    app: twin-node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twin-node
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: twin-node
+    spec:
+      initContainers:
+        # 1) Wait for MySQL to accept connections before bootstrapping.
+        - name: wait-for-mysql
+          image: mysql:8.4.7
+          env:
+            - name: MYSQL_HOST
+              value: twin-node-db.twin.svc.cluster.local
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_USER
+              value: twin
+            - name: MYSQL_PASSWORD
+              value: twin
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Waiting for MySQL at $MYSQL_HOST:$MYSQL_PORT to become ready..."
+              until mysqladmin ping -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" --silent; do
+                echo "MySQL is not ready yet. Retrying in 5 seconds..."
+                sleep 5
+              done
+              echo "MySQL is ready!"
+        # 2) Bootstrap the node following common/HOWTO-bootstrap-node.md.
+        #    Connector config (entity-storage MySQL) comes from /app/.env, which is the
+        #    shared common/.env.local mounted via the ConfigMap.
+        #    Guarded by a marker file on the shared volume so it runs only once.
+        - name: bootstrap
+          image: twinfoundation/twin-node:0.0.3-next.40
+          env:
+            # In-cluster overrides of common/.env.local (see header note 2).
+            - name: TWIN_MY_SQL_HOST
+              value: twin-node-db.twin.svc.cluster.local
+            - name: TWIN_PUBLIC_ORIGIN
+              value: http://twin.example.com/
+            - name: TWIN_TENANT_ENABLED
+              value: "true"
+            # MUST match the volumeMount below - see header note 2.
+            - name: TWIN_STORAGE_FILE_ROOT
+              value: /var/lib/twin
+            # Admin login created during bootstrap. CHANGE THE PASSWORD before applying.
+            - name: TWIN_ADMIN_USER_NAME
+              value: admin@twin
+            - name: TWIN_ADMIN_USER_PASSWORD
+              value: "ChangeMe_please!"
+          volumeMounts:
+            - name: twin-data
+              mountPath: /var/lib/twin
+            - name: default-env
+              mountPath: /app/.env
+              subPath: .env
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              MARKER=/var/lib/twin/.bootstrap-done
+              if [ -f "$MARKER" ]; then
+                echo "Bootstrap already completed ($MARKER present); skipping."
+                exit 0
+              fi
+
+              # Admin credentials come from the container env above.
+              ADMIN_NAME="${TWIN_ADMIN_USER_NAME:-admin@twin}"
+              ADMIN_PASS="${TWIN_ADMIN_USER_PASSWORD:?TWIN_ADMIN_USER_PASSWORD must be set}"
+
+              CLI="node /app/src/index.js"
+              did_of() { echo "$1" | tr -d '\r' | grep -oE 'did:[a-z0-9-]+:0x[0-9a-f]+' | head -n1; }
+
+              echo "== Creating node identity =="
+              OUT=$($CLI identity-create); echo "$OUT"
+              NODE_DID=$(did_of "$OUT"); echo "Node DID: $NODE_DID"
+              $CLI identity-verification-method-create --identity="$NODE_DID" --verification-method-id="sign-0"
+              $CLI identity-verification-method-create --identity="$NODE_DID" --verification-method-id="auth-signing"
+              $CLI identity-verification-method-create --identity="$NODE_DID" --verification-method-id="trust-assertion"
+
+              echo "== Setting node identity =="
+              $CLI node-set-identity --identity="$NODE_DID"
+              $CLI vault-key-create --identity="$NODE_DID" --key-id="param-encryption" --key-type="ChaCha20Poly1305"
+
+              echo "== Creating tenant =="
+              OUT=$($CLI tenant-create); echo "$OUT"
+              TENANT_ID=$(echo "$OUT" | tr -d '\r' | sed -n 's/.*Tenant ID:[[:space:]]*\([0-9a-fA-F]\{8,\}\).*/\1/p' | head -n1)
+              echo "Tenant ID: $TENANT_ID"
+              $CLI node-set-tenant --tenant-id="$TENANT_ID"
+
+              echo "== Creating organization identity =="
+              OUT=$($CLI identity-create); echo "$OUT"
+              ORG_DID=$(did_of "$OUT"); echo "Org DID: $ORG_DID"
+              $CLI identity-verification-method-create --identity="$ORG_DID" --verification-method-id="sign-0"
+              $CLI identity-verification-method-create --identity="$ORG_DID" --verification-method-id="trust-assertion" --verification-method-type="assertionMethod"
+
+              echo "== Creating admin user identity =="
+              OUT=$($CLI identity-create); echo "$OUT"
+              USER_DID=$(did_of "$OUT"); echo "User DID: $USER_DID"
+              $CLI identity-verification-method-create --identity="$USER_DID" --verification-method-id="sign-0"
+
+              echo "== Creating admin user ($ADMIN_NAME) =="
+              $CLI user-create --user-identity="$USER_DID" --organization-identity="$ORG_DID" --email="$ADMIN_NAME" --password="$ADMIN_PASS" --scope="tenant-admin" --tenant-id="$TENANT_ID"
+
+              touch "$MARKER"
+              echo "== Bootstrap complete: node=$NODE_DID tenant=$TENANT_ID org=$ORG_DID user=$USER_DID =="
+      containers:
+        - name: twin-node
+          image: twinfoundation/twin-node:0.0.3-next.40
+          env:
+            # In-cluster overrides of common/.env.local (see header note 2).
+            - name: TWIN_MY_SQL_HOST
+              value: twin-node-db.twin.svc.cluster.local
+            - name: TWIN_PUBLIC_ORIGIN
+              value: http://twin.example.com/
+            - name: TWIN_TENANT_ENABLED
+              value: "true"
+            # MUST match the bootstrap container and the volumeMount - see header note 2.
+            - name: TWIN_STORAGE_FILE_ROOT
+              value: /var/lib/twin
+          livenessProbe:
+            exec:
+              command:
+                - wget
+                - --spider
+                - -q
+                - http://localhost:3000/health
+            failureThreshold: 5
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - name: twin-data
+              mountPath: /var/lib/twin
+            - name: default-env
+              mountPath: /app/.env
+              subPath: .env
+      restartPolicy: Always
+      volumes:
+        - name: twin-data
+          persistentVolumeClaim:
+            claimName: twin-data
+        - name: default-env
+          configMap:
+            name: twin-node-env
+            items:
+              - key: dotenv
+                path: .env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twin-node
+  namespace: twin
+  labels:
+    app: twin-node
+spec:
+  ports:
+    - name: "3000"
+      port: 3000
+      targetPort: 3000
+  selector:
+    app: twin-node
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: twin-node
+  namespace: twin
+  labels:
+    app: twin-node
+spec:
+  rules:
+    - host: twin.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: twin-node
+                port:
+                  number: 3000
