@@ -14,4 +14,13 @@ else
 fi
 final_command="$command $* $bootstrap_env"
 
-docker compose run --rm -it twin-node sh -c "${final_command}"
+# Only allocate a TTY when one is attached, so the output can be captured
+# (e.g. from a command substitution in onboard-org.sh) without docker failing
+# with "the input device is not a TTY".
+if [ -t 0 ] && [ -t 1 ]; then
+    tty_flag='-it'
+else
+    tty_flag='-i'
+fi
+
+docker compose run --rm $tty_flag twin-node sh -c "${final_command}"

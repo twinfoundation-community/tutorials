@@ -1,3 +1,5 @@
 {
-    "id": "did:entity-storage:0x0da317b8a3816ca39bab3dd8e7e6d18656956fbf520f1f270c65bd90f3bc3a1f"
+    "@context": "https://schema.org",
+    "type": "Organization",
+    "id": "did:entity-storage:0x49686fbc29d48ff89813cd0743874507002cc4744aa515e8298e5b15a0eaf9ed"
 }

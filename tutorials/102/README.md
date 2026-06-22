@@ -6,6 +6,12 @@
 
 * `twin-node.sh` script to bootstrap and administer a Node. Use `twin-node.sh --help` to see the list of available commands.
 
+* `onboard-org.sh` script to onboard an organization on an already bootstrapped Node. It takes the organization DID plus a user name and password, then adds the organization's verification methods and blob-encryption key, creates a tenant, and creates an admin user for it:
+
+```sh
+./onboard-org.sh <organization-did> <user-name> <user-password>
+```
+
 ## Getting started
 
 You can use:

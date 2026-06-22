@@ -1,5 +1,7 @@
 # Steps to bootstrap a Node
 
+## Node Identity
+
 1. Create a Decentralized Identity for the Node
 
 ```sh
@@ -15,8 +17,10 @@
 1. Set Node Identity
 
 ```sh
-/twin-node.sh node-set-identity --identity="did:entity-storage:0x0565892dfbcdcbdf9e93a2f332c68cc40935ba8d50d720bc38ed22bedc72071a"
+./twin-node.sh node-set-identity --identity="did:entity-storage:0x0565892dfbcdcbdf9e93a2f332c68cc40935ba8d50d720bc38ed22bedc72071a"
 ```
+
+## Organization setup
 
 1. Create organization identity
 
@@ -53,7 +57,7 @@ Add an encryption key for blob storage at rest, to encrypt documents.
 1. Create a tenant
 
 ```sh
-./twin-node.sh tenant-create
+./twin-node.sh tenant-create --organization-id=did:entity-storage:0x49686fbc29d48ff89813cd0743874507002cc4744aa515e8298e5b15a0eaf9ed
 ```
 
 ```sh
@@ -81,7 +85,7 @@ Although not strictly necessary a verification method could be added for the use
 This login and pass will allow to generate authentication tokens for regular Node services (not Dataexchange operations).
 
 ```sh
-twin-node.sh user-create --user-identity="did:entity-storage:0x27fd6b9c9951165fae9e1160cee946308f6776d3abb72a61cf55853321743417" --organization-identity="did:entity-storage:0x49686fbc29d48ff89813cd0743874507002cc4744aa515e8298e5b15a0eaf9ed" --email="jcantera@example.com" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019eef73d629745a99083dc7faaae5d8"
+./twin-node.sh user-create --user-identity="did:entity-storage:0x27fd6b9c9951165fae9e1160cee946308f6776d3abb72a61cf55853321743417" --organization-identity="did:entity-storage:0x49686fbc29d48ff89813cd0743874507002cc4744aa515e8298e5b15a0eaf9ed" --email="jcantera@example.com" --password="yM5?NgPPAio+TmWx" --scope="tenant-admin" --tenant-id="019eef73d629745a99083dc7faaae5d8"
 ```
 
 ```sh
