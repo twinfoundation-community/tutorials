@@ -36,7 +36,6 @@ export interface IConsumerClientConstructorOptions {
 	 */
 	transferProcessEntityStorageType?: string;
 
-
 	/**
 	 * Tenant admin component type.
 	 * @default tenant-admin-service

@@ -39,18 +39,26 @@ export async function extensionInitialise(
 		}
 	];
 
+	// This is a pure CONSUMER node: it hosts no datasets of its own. The federated
+	// catalogue it must read is the PROVIDER's, reached via the remote RestClient.
+	// Make that remote client the DEFAULT so the dataspace control plane (whose
+	// negotiateAgreement does federatedCatalogue.get(datasetId) to validate the
+	// offer) resolves the dataset from the provider, not from the empty local
+	// catalogue. The local Service is kept only so its REST routes still exist.
 	nodeEngineConfig.types.federatedCatalogueComponent = [
-		{
-			type: FederatedCatalogueComponentType.Service,
-			restPath: "federated-catalogue",
-			isDefault: true
-		},
 		{
 			type: FederatedCatalogueComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000"
+				// The consumer reads the PROVIDER node's federated catalogue across the
+				// docker network, so this is the provider container name.
+				endpoint: "http://dpi.provider:3000"
 			},
-			features: ["remote"]
+			features: ["remote"],
+			isDefault: true
+		},
+		{
+			type: FederatedCatalogueComponentType.Service,
+			restPath: "federated-catalogue"
 		}
 	];
 
@@ -58,12 +66,7 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.Service,
 			options: {
-				config: {
-					// This override REPLACES the env-built control-plane config, so the
-					// data plane path must be forwarded or pull transfers fail at
-					// startTransfer with "pullTransfersNotSupported" (walkthrough Bug 1b).
-					dataPlanePath: process.env.TWIN_DATASPACE_DATA_PLANE_PATH ?? "dataspace/entities"
-				}
+				config: {}
 			},
 			restPath: "dataspace-control-plane",
 			isDefault: true
@@ -71,7 +74,9 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.RestClient,
 			options: {
-				endpoint: "http://host.docker.internal:3000"
+				// Default remote control-plane endpoint (provider container). Per-call the
+				// consumer overrides this with the providerEndpoint resolved from the catalogue.
+				endpoint: "http://dpi.provider:3000"
 			},
 			features: ["remote"],
 			isMultiInstance: true
@@ -91,6 +96,37 @@ export async function extensionInitialise(
 			type: DataspaceDataPlaneComponentType.RestClient,
 			features: ["remote"],
 			isMultiInstance: true
+		}
+	];
+
+	// When the consumer initiates a contract negotiation, the PNP
+	// (sendRequestToProvider) builds a trust token whose credentialSubject is the
+	// policy data returned by the Policy Information Point. With no PIP source the
+	// PIP returns {} and the VC generator (info?.subject ?? {id}) keeps that empty
+	// object, so verifiableCredentialCreate fails with guard.objectValue on an empty
+	// subject. A static public source gives the consumer a non-empty subject so the
+	// negotiation trust token can be minted. (The empty-policyData -> empty-subject
+	// path is a platform robustness gap; this static source is the supported
+	// config-level workaround.)
+	nodeEngineConfig.types.rightsManagementPolicyInformationSourceComponent = [
+		{
+			type: "static",
+			options: {
+				config: {
+					information: [
+						{
+							accessMode: "public",
+							objects: {
+								"urn:dpi:consumer-profile": {
+									"@context": "https://schema.org",
+									"@type": "Organization"
+									// purpose: "data-consumption"
+								}
+							}
+						}
+					]
+				}
+			}
 		}
 	];
 }
@@ -181,10 +217,13 @@ export function consumerClientInitialiser(
  * @returns The rest routes.
  */
 export function generateRestRoutes(baseRouteName: string, componentName: string): IRestRoute[] {
-	const consumerClientRoute: IRestRoute<{ body: unknown }, { body: unknown }> = {
+	const consumerClientRoute: IRestRoute<
+		{ body: { agreementId: string; entityType: string } },
+		{ body: unknown }
+	> = {
 		operationId: "consumerClient",
 		summary: "Get Data",
-		method: "GET",
+		method: "POST",
 		tag: "client",
 		path: `${baseRouteName}/query-data`,
 		handler: async (httpRequestContext, request) =>
@@ -201,7 +240,30 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
 		]
 	};
 
-	return [consumerClientRoute];
+	const negotiateRoute: IRestRoute<
+		{ body: { datasetId: string } },
+		{ body: { agreementId: string } }
+	> = {
+		operationId: "negotiate",
+		summary: "Negotiate Data",
+		method: "POST",
+		tag: "negotiation",
+		path: `${baseRouteName}/negotiate`,
+		handler: async (httpRequestContext, request) =>
+			negotiate(httpRequestContext, componentName, request),
+		requestType: {
+			type: "unknown",
+			examples: []
+		},
+		responseType: [
+			{
+				type: "unknown",
+				examples: []
+			}
+		]
+	};
+
+	return [consumerClientRoute, negotiateRoute];
 }
 
 /**
@@ -210,15 +272,41 @@ export function generateRestRoutes(baseRouteName: string, componentName: string)
  * @param componentName The name of the component to use in the routes.
  * @param request The request.
  * @param request.body The body
+ * @param request.body.datasetId The datasetId
+ * @returns The response object with additional http response properties.
+ */
+export async function negotiate(
+	httpRequestContext: IHttpRequestContext,
+	componentName: string,
+	request: { body: { datasetId: string } }
+): Promise<{ body: { agreementId: string } }> {
+	const component = ComponentFactory.get<IConsumerClientComponent>(componentName);
+	const result = await component.negotiate(request.body.datasetId);
+
+	return {
+		body: {
+			agreementId: result
+		}
+	};
+}
+
+/**
+ * Get data.
+ * @param httpRequestContext The request context for the API.
+ * @param componentName The name of the component to use in the routes.
+ * @param request The request.
+ * @param request.body The body string params.
+ * @param request.body.agreementId The agreement id to fetch data for.
+ * @param request.body.entityType The type of entity associated with the agreementId.
  * @returns The response object with additional http response properties.
  */
 export async function consumerGetData(
 	httpRequestContext: IHttpRequestContext,
 	componentName: string,
-	request: { body: unknown }
+	request: { body: { agreementId: string; entityType: string } }
 ): Promise<{ body: unknown }> {
 	const component = ComponentFactory.get<IConsumerClientComponent>(componentName);
-	const result = await component.getData();
+	const result = await component.getData(request.body.agreementId, request.body.entityType);
 
 	return {
 		body: result

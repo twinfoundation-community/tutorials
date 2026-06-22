@@ -20,9 +20,7 @@ import {
 } from "@twin.org/dataspace-models";
 import { LogLevel, type ILoggingComponent } from "@twin.org/logging-models";
 import { nameof } from "@twin.org/nameof";
-import type {
-	IDataspaceProtocolDataset
-} from "@twin.org/standards-dataspace-protocol";
+import type { IDataspaceProtocolDataset } from "@twin.org/standards-dataspace-protocol";
 import type { IActivityStreamsActivity } from "@twin.org/standards-w3c-activity-streams";
 import type { ITestAppConstructorOptions } from "./ITestAppConstructorOptions.js";
 
@@ -90,7 +88,7 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 	/**
 	 * App Name.
 	 */
-	public static readonly APP_ID = "https://vtwt-1.virtualwatchtower.org";
+	public static readonly APP_ID = "urn:app:dpi-frontiers";
 
 	/**
 	 * Runtime name for the class.
@@ -196,19 +194,6 @@ export class TestDataspaceDataPlaneApp implements IDataspaceApp {
 				processingGroupId: "test-default"
 			}
 		];
-	}
-
-	/**
-	 * Datasets handled by this DS App.
-	 * @param dataset the Dataset
-	 * @returns Datasets handled.
-	 */
-	public async datasetsHandled(
-		dataset: IDataspaceProtocolDataset
-	): Promise<IDataspaceProtocolDataset[]> {
-		// The platform bakes ?organization=<org-did>
-		// into the distribution URLs at publish time, no app-side URL mutation needed.
-		return [dataset];
 	}
 
 	/**

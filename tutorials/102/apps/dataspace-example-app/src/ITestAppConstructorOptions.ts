@@ -12,7 +12,6 @@ export interface ITestAppConstructorOptions {
 	 */
 	loggingComponentType?: string;
 
-
 	/**
 	 * Auditable Item Graph Component type.
 	 */
