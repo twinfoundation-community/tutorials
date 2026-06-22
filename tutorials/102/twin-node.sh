@@ -7,8 +7,11 @@ fi
 
 command='node src/index.js'
 
-bootstrap_env='--load-env=./.env.local.bootstrap'
+if [ "$1" = "bootstrap-legacy" ]; then
+    bootstrap_env='--load-env=./.env.local.bootstrap,./.env.bootstrap-legacy'
+else
+    bootstrap_env='--load-env=./.env.local.bootstrap'
+fi
 final_command="$command $* $bootstrap_env"
-
 
 docker compose run --rm -it twin-node sh -c "${final_command}"
