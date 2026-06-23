@@ -8,10 +8,8 @@ import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/conte
 import { ArrayHelper, ComponentFactory, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
-	type IDataspaceDataPlaneComponent,
 	type IDataspaceControlPlaneComponent
 } from "@twin.org/dataspace-models";
-import { DataspaceDataPlaneComponentType } from "@twin.org/engine-types";
 import type { IFederatedCatalogueComponent } from "@twin.org/federated-catalogue-models";
 import { type ILoggingComponent, LogLevel } from "@twin.org/logging-models";
 import {
@@ -106,21 +104,24 @@ export class ConsumerClient implements IConsumerClientComponent {
 							reject(new Error(`No data address supplied for transfer process ${consumerPid}`));
 							return;
 						}
-						const dataProviderDataPlane = ComponentFactory.create<IDataspaceDataPlaneComponent>(
-							DataspaceDataPlaneComponentType.RestClient,
-							{
-								endpoint
-							}
-						);
-						const entities = await dataProviderDataPlane.getDataAssetEntities(
-							{
-								entityType
-							},
-							consumerPid,
-							undefined,
-							undefined,
-							token
-						);
+						// The data-plane endpoint is the full channel URL and the access token is
+						// carried in its endpointProperties, so fetch it directly. (The
+						// DataspaceDataPlaneRestClient hardcodes a "dataspace-data-plane" base path
+						// that does not match 102's "/dataspace" data-plane mount, which would
+						// double the path and 404.)
+						const accessToken = message.dataAddress?.endpointProperties?.find(
+							property => property.name === "authorization"
+						)?.value;
+						const separator = endpoint.includes("?") ? "&" : "?";
+						const dataUrl = `${endpoint}${separator}consumerPid=${encodeURIComponent(
+							consumerPid
+						)}&type=${encodeURIComponent(entityType)}`;
+						const response = await fetch(dataUrl, {
+							headers: Is.stringValue(accessToken)
+								? { Authorization: `Bearer ${accessToken}` }
+								: {}
+						});
+						const entities = await response.json();
 
 						resolve(entities);
 					},
@@ -142,12 +143,11 @@ export class ConsumerClient implements IConsumerClientComponent {
 					onTerminated: async (consumerPid: string, reason?: string) => {}
 				});
 
-				// The PROVIDER node mounts its dataspace control plane at base path
-				// "dataspace" (node default). Only the consumer renamed its own control
-				// plane to "dataspace-control-plane" via the extension restPath, so the
-				// provider-facing transfer endpoint must use "dataspace".
+				// Single-node 102: the (same) node mounts its dataspace control plane at
+				// "dataspace-control-plane" (the extension restPath), so the provider-facing
+				// transfer endpoint uses that. (The two-node Frontiers case uses "dataspace".)
 				const providerEndpointTransfer = new URL(providerEndpoint);
-				providerEndpointTransfer.pathname += "dataspace";
+				providerEndpointTransfer.pathname += "dataspace-control-plane";
 
 				// prepareTransfer no longer takes a consumer callback address; the platform
 				// reads it from the request context (HttpContextIdKeys.PublicOrigin =

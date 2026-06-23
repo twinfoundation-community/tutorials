@@ -39,26 +39,22 @@ export async function extensionInitialise(
 		}
 	];
 
-	// This is a pure CONSUMER node: it hosts no datasets of its own. The federated
-	// catalogue it must read is the PROVIDER's, reached via the remote RestClient.
-	// Make that remote client the DEFAULT so the dataspace control plane (whose
-	// negotiateAgreement does federatedCatalogue.get(datasetId) to validate the
-	// offer) resolves the dataset from the provider, not from the empty local
-	// catalogue. The local Service is kept only so its REST routes still exist.
+	// Tutorial 102 is a SINGLE node: provider and consumer are tenants on the same node,
+	// so the federated catalogue is local. The in-process Service is the default; the
+	// remote RestClient is kept only as a non-default option (the two-node Frontiers case
+	// points it at the provider container, e.g. http://dpi.provider:3000).
 	nodeEngineConfig.types.federatedCatalogueComponent = [
 		{
-			type: FederatedCatalogueComponentType.RestClient,
-			options: {
-				// The consumer reads the PROVIDER node's federated catalogue across the
-				// docker network, so this is the provider container name.
-				endpoint: "http://dpi.provider:3000"
-			},
-			features: ["remote"],
+			type: FederatedCatalogueComponentType.Service,
+			restPath: "federated-catalogue",
 			isDefault: true
 		},
 		{
-			type: FederatedCatalogueComponentType.Service,
-			restPath: "federated-catalogue"
+			type: FederatedCatalogueComponentType.RestClient,
+			options: {
+				endpoint: "http://host.docker.internal:3000"
+			},
+			features: ["remote"]
 		}
 	];
 
@@ -66,7 +62,21 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.Service,
 			options: {
-				config: {}
+				config: {
+					// This override REPLACES the env-built control-plane config, so the data
+					// plane path must be forwarded or pull transfers fail at startTransfer
+					// with "pullTransfersNotSupported".
+					// eslint-disable-next-line no-restricted-syntax -- tutorial extension reads node env directly
+					dataPlanePath: process.env.TWIN_DATASPACE_DATA_PLANE_PATH ?? "dataspace/entities",
+					// The automated consumer-client getData() waits for the transfer to reach
+					// STARTED, so on single-node 102 the provider must auto-start it on request
+					// (the default). The manual Postman/curl DSP walkthrough instead drives the
+					// provider start step itself (transfer ".../start"), which needs auto-start
+					// OFF so that start returns the data address synchronously. Flip it per flow
+					// with TWIN_DATASPACE_AUTO_START_TRANSFERS=false plus a node restart.
+					// eslint-disable-next-line no-restricted-syntax -- tutorial extension reads node env directly
+					autoStartTransfers: process.env.TWIN_DATASPACE_AUTO_START_TRANSFERS !== "false"
+				}
 			},
 			restPath: "dataspace-control-plane",
 			isDefault: true
@@ -74,9 +84,9 @@ export async function extensionInitialise(
 		{
 			type: DataspaceControlPlaneComponentType.RestClient,
 			options: {
-				// Default remote control-plane endpoint (provider container). Per-call the
-				// consumer overrides this with the providerEndpoint resolved from the catalogue.
-				endpoint: "http://dpi.provider:3000"
+				// Default remote control-plane endpoint. Per-call the consumer overrides this
+				// with the providerEndpoint resolved from the catalogue. Single-node: same node.
+				endpoint: "http://host.docker.internal:3000"
 			},
 			features: ["remote"],
 			isMultiInstance: true

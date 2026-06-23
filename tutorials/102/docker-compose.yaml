@@ -27,11 +27,12 @@ services:
       - ../../common/init:/docker-entrypoint-initdb.d
 
   twin-node:
-    # Published post-refactor image (org-identifiers #19/#203). next.56 carries node-core
-    # 0.0.3-next.56, rights-management-pnp 0.0.3-next.51 (incl. provider-org callback fix
-    # #181) and federated-catalogue 0.0.3-next.21 (object-form accessService bake fix #88).
-    # Verified 2026-06-16. To pin a newer build just bump the tag.
-    image: twinfoundation/twin-node:0.0.3-next.63
+    # Published image. next.66 bakes twin-node 0.0.3-next.66, dataspace
+    # control+data-plane+models 0.0.3-next.55 (incl. the implicit-trust cross-org fix),
+    # rights-management-pap 0.9.0-next.1, federated-catalogue 0.0.3-next.23,
+    # engine-core 0.0.3-next.56, core 0.9.0-next.1.
+    # Verified against the pulled image 2026-06-23. Bump the tag to pin a newer build.
+    image: twinfoundation/twin-node:0.0.3-next.66
     # Local build (only needed when Docker Hub lags the refactor — kept for reference):
     # build:
     #   context: ../../../twin-node
