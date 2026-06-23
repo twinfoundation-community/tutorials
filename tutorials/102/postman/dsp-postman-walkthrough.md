@@ -1,7 +1,7 @@
 # Tutorial 102 — DSP Pull-Mode Postman Walkthrough
 
 > Created: 2026-06-11
-> Last updated: 2026-06-23
+> Last updated: 2026-06-24
 
 > **⚠️ #203 update (organization identifiers, 2026-06-11).** This walkthrough and the collection in `postman/` have been migrated to the org-identifiers refactor (twin-node#19 / PR #203) and re-verified end-to-end via curl. What changed:
 > - **Routing:** `x-api-key` works ONLY on `/authentication/login` (A1/B1). Every other request is tenant-routed by `?organization=<org-did>` — the collection now uses `{{prov_did}}` / `{{cons_did}}` there. Encrypted tenant tokens (`x-enc-tenant-token`, `prov_tenant_token`/`cons_tenant_token` env vars) are GONE.
@@ -11,7 +11,7 @@
 > - **C6:** `data_endpoint` arrives with `?organization=<provider-org-did>` baked by the catalogue/control-plane (cleartext — the encrypted-token URL-mangling pitfall is moot).
 > - **C-shortcut:** now a **two-call** extension API: `POST /consumer-client/negotiate {datasetId}` returns `{agreementId}`, then `POST /consumer-client/query-data {agreementId, entityType}` returns the data. It runs end-to-end only when `TWIN_DATASPACE_AUTO_START_TRANSFERS="true"` (the default; the provider auto-starts so the extension's awaited `onStarted` callback fires). The old single-call `GET /query-data` + MySQL SELECT is superseded.
 > - **Auto-start (2026-06-23):** the automated C-shortcut (Way 1) and this manual walkthrough (Way 2) need **opposite** `TWIN_DATASPACE_AUTO_START_TRANSFERS` values. Way 1 needs `"true"`; **this manual walkthrough needs `"false"`** so the provider does NOT auto-start and C5 `start` returns the data address synchronously. Flip it in `.env.multitenant` and `docker compose up -d` (no rebuild).
-> - **Docker image:** as of 2026-06-23 docker-compose uses the **published** image `twinfoundation/twin-node:0.0.3-next.66` (bakes dataspace control+data-plane+models `0.0.3-next.55` incl. the implicit-trust cross-org fix, engine-core `0.0.3-next.56`, rights-management-pap `0.9.0-next.1`, federated-catalogue `0.0.3-next.23`, core `0.9.0-next.1`; verified inside the pulled image). Both platform bugs found during this migration are now fixed upstream and published; the only tutorial-side fix is the consumer-client extension forwarding `dataPlanePath`. Full record: [`next53-org-identifiers-migration-and-findings.md`](./next53-org-identifiers-migration-and-findings.md).
+> - **Docker image:** as of 2026-06-23 docker-compose uses the **published** image `twinfoundation/twin-node:0.0.3-next.66` (bakes dataspace control+data-plane+models `0.0.3-next.55` incl. the implicit-trust cross-org fix, engine-core `0.0.3-next.56`, rights-management-pap `0.9.0-next.1`, federated-catalogue `0.0.3-next.23`, core `0.9.0-next.1`; verified inside the pulled image). The tutorial-side fixes are the single-node corrections in `apps/consumer-client` and `apps/dataspace-example-app`.
 > - **C1 bearer:** the catalogue query uses the trust VC `{{cons_trust_jwt}}`, not the session JWT (the `#194` trust model). `trustHelper.trustVerifyFailed` means you sent the session JWT.
 
 
@@ -28,8 +28,8 @@ By the end you'll have:
 ## TL;DR
 
 - **Setup, full flow C5–C6, fetching data**: all 100% Postman. ✅
-- **The CALLBACK-based negotiation (C2/C3)**: still NOT possible from Postman — the consumer-side state machine must be bootstrapped in-process (re-confirmed in code on next.53). ❌
-- **2026-06-12 update (verified on next.53): the POLLING path makes the ENTIRE flow 100% Postman-able** — C2′ → C3a′–e′ → C3f′ (fetch agreement via provider admin route) → C4 (works given a real `agreement_id`; `callbackAddress` is schema-required in the body) → C5 → C6. ✅
+- **The CALLBACK-based negotiation (C2/C3)**: still NOT possible from Postman — the consumer-side state machine must be bootstrapped in-process (architecture unchanged through next.66). ❌
+- **Re-verified on next.66: the POLLING path makes the ENTIRE flow 100% Postman-able** — C2′ → C3a′–e′ → C3f′ (fetch agreement via provider admin route) → C4 (works given a real `agreement_id`; `callbackAddress` is schema-required in the body) → C5 → C6. ✅
 - **The C-shortcut** is now a two-call extension API (`POST /consumer-client/negotiate` → `POST /consumer-client/query-data`) and needs `TWIN_DATASPACE_AUTO_START_TRANSFERS="true"`. This manual walkthrough (Way 2) instead needs it `"false"`.
 
 This is the same architectural pattern as OAuth 2.0 — pure HTTP tools can complete pieces of the dance, but the consumer needs a real client app that holds session state and registers callbacks.
@@ -88,7 +88,7 @@ These are populated by the auto-extraction scripts as you run the flow — leave
 | **C5** | Postman | `POST /transfers/:pid/start` — provider returns access endpoint + bearer token (Way 2; needs auto-start `"false"`) |
 | **C6** | Postman | `GET /dataspace/entities` — actual data flowing from provider to consumer |
 
-C2/C3 in the collection are kept for reference only — they show the correct callback-style DSP shape but fail with `negotiationNotFound` because they require consumer-side state that no REST endpoint can create (re-confirmed in code on next.53). C4 DOES work from Postman when fed a real `agreement_id` — use the C-poll path below to obtain one. See [why](#why-c2c3c4-arent-100-postman-able).
+C2/C3 in the collection are kept for reference only — they show the correct callback-style DSP shape but fail with `negotiationNotFound` because they require consumer-side state that no REST endpoint can create (architecture unchanged through next.66). C4 DOES work from Postman when fed a real `agreement_id` — use the C-poll path below to obtain one. See [why](#why-c2c3c4-arent-100-postman-able).
 
 A `C-poll` folder drives the **negotiation phase** end-to-end from Postman by omitting `callbackAddress` and polling the provider — requires `rights-management-pnp-service` >= `0.0.3-next.41`. See [Polling-only path for the negotiation phase](#polling-only-path-for-the-negotiation-phase-rights-management--003-next41) for what it does and does not unlock.
 
@@ -347,7 +347,7 @@ Consumer (Postman)                           Provider PNP (local)
 
 Because no callback is ever sent to the consumer, the consumer-side `pnap.get(consumerPid)` lookup (the original `negotiationNotFound` blocker above) is never exercised. The provider's PNP holds the full state and the consumer drives the protocol events via REST.
 
-**Scope (updated 2026-06-12, verified end-to-end on next.53).** The polling path now covers the **full pull flow**, not just negotiation: the public `GET /negotiations/:id` is DSP-spec-minimal (pids + state, no agreement), so fetch the agreement via the provider **admin** route (`C3f′` in the collection, auto-saves `agreement_id`), then `C4` (include `callbackAddress` — schema-required) returns `TransferProcess REQUESTED`, and `C5`/`C6` complete on that transfer. No consumer-side bootstrap is needed for pulls — the earlier claim that the transfer layer required it is outdated.
+**Scope (verified end-to-end on next.66).** The polling path now covers the **full pull flow**, not just negotiation: the public `GET /negotiations/:id` is DSP-spec-minimal (pids + state, no agreement), so fetch the agreement via the provider **admin** route (`C3f′` in the collection, auto-saves `agreement_id`), then `C4` (include `callbackAddress` — schema-required) returns `TransferProcess REQUESTED`, and `C5`/`C6` complete on that transfer. No consumer-side bootstrap is needed for pulls — the earlier claim that the transfer layer required it is outdated.
 
 A `C-poll` request folder in the Postman collection demonstrates this variant — see `postman/README.md` for the request order.
 

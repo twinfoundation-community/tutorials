@@ -15,7 +15,7 @@ This README is the manual companion: every request, every header, every body, ev
 
 ## Prerequisites
 
-- `tutorials/102` node up via `docker compose up -d` (provider + consumer tenants bootstrapped with org DIDs — see `../next53-org-identifiers-migration-and-findings.md §3`).
+- `tutorials/102` node up via `docker compose up -d` (provider + consumer tenants bootstrapped with org DIDs via `twin-node.sh` + `onboard-org.sh`).
 - The published image `twinfoundation/twin-node:0.0.3-next.66` (or newer) bakes dataspace `0.0.3-next.55` (incl. the implicit-trust cross-org fix), engine-core `0.0.3-next.56`, and core `0.9.0-next.1`.
 - `common/.env.local` has the two rights-management env vars (else the data-pull leg returns `noArbiters` / `noProcessors`):
   ```sh
@@ -447,4 +447,4 @@ Run order:
 | **C3e′** | `GET /rights-management/negotiations/:id` | poll until `state: FINALIZED` |
 | **C3f′** | `GET /rights-management/negotiations/admin/:id` (provider session) | fetch the agreement — the public GET is spec-minimal — auto-saves `agreement_id` |
 
-**Updated 2026-06-12 (verified on next.53):** no longer scoped to negotiation only — after C3f′ captures `agreement_id`, continue with C4 (include `callbackAddress` in the body — it is schema-required) → C5 → C6, all pure REST. The pull flow needs no consumer-side bootstrap; the `C-shortcut` is now just a convenience. See [../dsp-postman-walkthrough.md](../dsp-postman-walkthrough.md#polling-only-path-for-the-negotiation-phase-rights-management--003-next41) for the full architectural explanation.
+**Verified on next.66:** no longer scoped to negotiation only — after C3f′ captures `agreement_id`, continue with C4 (include `callbackAddress` in the body — it is schema-required) → C5 → C6, all pure REST. The pull flow needs no consumer-side bootstrap; the `C-shortcut` is now just a convenience. See [../dsp-postman-walkthrough.md](../dsp-postman-walkthrough.md#polling-only-path-for-the-negotiation-phase-rights-management--003-next41) for the full architectural explanation.
