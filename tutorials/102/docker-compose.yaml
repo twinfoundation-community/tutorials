@@ -27,15 +27,7 @@ services:
       - ../../common/init:/docker-entrypoint-initdb.d
 
   twin-node:
-    # Published post-refactor image (org-identifiers #19/#203). next.56 carries node-core
-    # 0.0.3-next.56, rights-management-pnp 0.0.3-next.51 (incl. provider-org callback fix
-    # #181) and federated-catalogue 0.0.3-next.21 (object-form accessService bake fix #88).
-    # Verified 2026-06-16. To pin a newer build just bump the tag.
-    image: twinfoundation/twin-node:0.0.3-next.63
-    # Local build (only needed when Docker Hub lags the refactor — kept for reference):
-    # build:
-    #   context: ../../../twin-node
-    #   dockerfile: apps/node/tests/kenyaCommunityUseCaseDefaultArbiter/Dockerfile
+    image: twinfoundation/twin-node:0.9.0
     container_name: twin_node
     hostname: node
     depends_on:
