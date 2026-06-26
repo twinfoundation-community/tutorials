@@ -5,7 +5,7 @@
 /* eslint-disable no-restricted-syntax */
 
 import { ContextIdKeys, ContextIdStore, type IContextIds } from "@twin.org/context";
-import { ComponentFactory, Is } from "@twin.org/core";
+import { ComponentFactory, type IError, Is } from "@twin.org/core";
 import {
 	DataspaceTransferFormat,
 	type IDataspaceDataPlaneComponent,
@@ -302,7 +302,8 @@ export class ConsumerClient implements IConsumerClientComponent {
 				await this._logging.log({
 					level: LogLevel.Error,
 					source: this.className(),
-					message: `General Error in the service: ${JSON.stringify(error)}`
+					message: `General Error in the service: ${JSON.stringify(error)}`,
+					error: error as IError
 				});
 				reject(error);
 			}
